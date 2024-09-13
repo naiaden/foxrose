@@ -1,0 +1,7 @@
+fastapi[standard]
+python-hue-v2
+dynaconf
+aiocoap==0.4.10
+DTLSSocket==0.1.19
+pydantic==1.10.18
+pytradfri

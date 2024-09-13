@@ -1,0 +1,9 @@
+version: '3'
+services:
+  lightapi:
+    build:
+      context: /home/louis/lightapi
+      dockerfile: Dockerfile
+    ports:
+      - "8555:8000"
+    restart: on-failure
