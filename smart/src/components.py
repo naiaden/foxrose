@@ -109,7 +109,7 @@ class Room:
     def __str__(self) -> str:
         return f"{self.name} [{self.id}]"
     
-    def summary(self):
+    def summary(self) -> dict:
         return {
             'name': self.name,
             'id': self.id,
