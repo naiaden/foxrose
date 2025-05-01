@@ -7,7 +7,8 @@ from pytradfri.api.libcoap_api import APIFactory
 from .config import settings
 from .components import Home
 
-home = Home(Hue(settings.HUE_IP, settings.hue_key))
+home = Home([Hue(settings.HUE_IP, settings.hue_key),
+             Hue(settings.HUE1_IP, settings.hue1_key)])
 
 app = FastAPI()
 
@@ -41,7 +42,7 @@ def _every_room_inactive() -> bool:
     res = True
     for room in home.rooms:
         for group in room.groups:
-            # print(f'{room.id} -- {group.id} -- {group.on} -- {group.brightness}')
+            print(f'{room.id} -- {group.id} -- {group.on} -- {group.brightness}')
             if group.on:
                 res = False
 
@@ -54,7 +55,14 @@ async def home_overview() -> dict:
     Returns:
         dict: A json response with the home's state.
     """
-    return {'home_active': not _every_room_inactive()}
+    return {'home_active': not _every_room_inactive(), 'nr_bridges': len(home.hues)}
+
+@app.post('/home/update')
+async def home_update() -> None:
+    """Processes all changes in the bridges, such as new scenes for the rooms, new references
+    to lights, and new rooms on the existing bridges.
+    """
+    home.initialise()
 
 @app.post('/home/active/toggle')
 async def home_toggle() -> None:
@@ -218,23 +226,36 @@ async def room_next(room_id: str) -> None:
     Args:
         room_id (str): The hue id of the room.
     """
+
     if room_id not in current_scene_room:
         current_scene_room[room_id] = 0
 
 
     if room := home.get_room_with_id(room_id):
-        selected_scene = current_scene_room[room_id] % len(room.scenes)
-        current_scene_room[room_id] += 1
+        if room.scenes:
+            selected_scene = current_scene_room[room_id] % len(room.scenes)
+            current_scene_room[room_id] += 1
 
-        room.scenes[selected_scene].activate()
+            room.scenes[selected_scene].activate()
 
 
-    
+@app.post('/room/{room_id}/scene/orientation')
+async def room_orientation(room_id: str) -> None:
+    """Activates the "orientatie" hue scene in room `room_id`. This action only has an effect if the 
+    room has the "orientatie" scene defined. Otherwise, nothing happens.
+    \f
+    Args:
+        room_id (str): The hue id of the room.
+    """
+    if room := home.get_room_with_id(room_id):
+        for scene in room.scenes:
+            if scene.name == "orientatie":
+                scene.activate()    
 
 @app.post('/room/{room_id}/scene/bright')
 async def room_bright(room_id: str) -> None:
     """Activates the "Bright" hue scene in room `room_id`. This action only has an effect if the 
-    room has the "Bright" scene defined. Otherwise, nothing happs.
+    room has the "Bright" scene defined. Otherwise, nothing happens.
     \f
     Args:
         room_id (str): The hue id of the room.
@@ -246,6 +267,11 @@ async def room_bright(room_id: str) -> None:
 
 
 ########## LAMP
+
+@app.get('/lamp/{lamp_id}')
+async def lamp_info(lamp_id: str) -> dict:
+    if lamp := home.get_lamp_with_id(lamp_id):
+        return lamp.summary()
 
 @app.post('/lamp/{lamp_id}/active/{active}')
 async def lamp_active(lamp_id: str, active: ActiveState) -> None:
@@ -271,3 +297,8 @@ async def lamp_brightness(lamp_id: str, step:int) -> None:
     if lamp := home.get_lamp_with_id(lamp_id):
         lamp.brightness = lamp.brightness + int(step)
 
+@app.post('/lamp/{lamp_id}/colour/{colour_value}')
+async def lamp_colour(lamp_id: str, colour_value:int) -> None:
+
+    if lamp := home.get_lamp_with_id(lamp_id):
+        lamp.colour = colour_value

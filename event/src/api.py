@@ -2,26 +2,31 @@ import paho.mqtt.client as mqtt
 import json
 import requests
 
-from event.src.config import settings
+from config import settings
+
+print(settings['valid_doorcards'])
 
 def doorcard(msg):
+    
     payload = json.loads(msg.payload.decode())
     if payload['Data']['Number'] in settings['valid_doorcards']:
+        print("LAMPJES")
         requests.post(f'http://{settings["lightapi_server"]}:8555/home/active/toggle')
 
 
-def doorbell(msg):
-    requests.post(f'http://{settings["loxone_server"]}/dev/sps/io/mqtt_deurbel_gaat/1')
+# def doorbell(msg):
+#     requests.post(f'http://{settings["loxone_server"]}/dev/sps/io/mqtt_deurbel_gaat/1')
 
 def on_connect(client, userdata, flags, reason_code, properties):
     print(f"Connected with result code {reason_code}")
     client.subscribe("DahuaVTO/DoorCard/Event/#")
 
 def on_message(client, userdata, msg):
+    # print(msg)
     match msg.topic:
         case "DahuaVTO/DoorCard/Event":
             doorcard(msg) 
-    # print(msg.topic+" "+str(msg.payload))
+    print(msg.topic+" "+str(msg.payload))
 
 print( 'mqtt connection')
 

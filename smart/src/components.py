@@ -8,27 +8,36 @@ from typing import Optional
 
 """
     The highest level of abstraction for an actual house powered by hue lights.
-    For now it only comprises one hue bridge.
+    Recently, a second bridge was added to our home.
     
     A home consists of physical rooms and lamps, and abstract groups and scenes.
 """
 class Home:
     """
+        Create a new, and initialised home instance
+    """
+    def __init__(self, bridges) -> None:
+        self.hues = bridges
+        print(f"{len(self.hues)} bridges in this home")
+        for b in self.hues:
+            logging.debug(b.bridge.ip_address)
+
+        return self.initialise()
+
+    """
         Rooms are lazily initialised, and its groups and scenes are added afterwards 
         as they can have a reference to their parent (Room).
     """
-    def __init__(self, bridge) -> None:
-        self.hue = bridge
-
+    def initialise(self) -> None:
         self.lamps = self.initialise_lamps()
         logging.info(f"{len(self.lamps)} lamps initialised")
         for l in self.lamps:
-            logging.debug(l.id, l.name, l.parent_id)
+            logging.debug(l.id, l.name, l.parent_id, l.bridge.bridge.ip_address)
 
         self.rooms = self.initialise_rooms()
         logging.info(f"{len(self.rooms)} rooms lazily initialised")
         for r in self.rooms:
-            logging.debug(str(r))
+            print(str(r))
 
         self.scenes = self.initialise_scenes()
         logging.info(f"{len(self.scenes)} scenes initialised")
@@ -78,16 +87,16 @@ class Home:
 
     
     def initialise_lamps(self) -> list[Lamp]:
-        return [Lamp(light) for light in self.hue.lights]
+        return [Lamp(light, bridge) for bridge in self.hues for light in bridge.lights]
     
     def initialise_rooms(self) -> list[Room]:
-        return [Room(room, self) for room in self.hue.rooms]
+        return [Room(room, self) for bridge in self.hues for room in bridge.rooms]
     
     def initialise_scenes(self) -> list[Scene]:
-        return [Scene(scene) for scene in self.hue.scenes]
+        return [Scene(scene) for bridge in self.hues for scene in bridge.scenes]
     
     def initialise_groups(self) -> list[Group]:
-        return [Group(group) for group in self.hue.grouped_lights]
+        return [Group(group) for bridge in self.hues for group in bridge.grouped_lights]
 
 
 class Room:
@@ -114,7 +123,7 @@ class Room:
             'name': self.name,
             'id': self.id,
             'nr_lamps': len(self.lamps),
-            'lamps': [str(l) for l in self.lamps],
+            'lamps': [(str(l), str(l.id)) for l in self.lamps],
             'nr_scenes': len(self.scenes),
             'scenes': [str(s) for s in self.scenes],
             'nr_groups': len(self.groups),
@@ -164,11 +173,12 @@ class Scene:
         return f"{self.name}"
 
 class Lamp:
-    def __init__(self, light):
+    def __init__(self, light, bridge):
         self.data = light.data_dict
         self.id = self.data['id']
         self.name = self.data['metadata']['name']
         self.parent_id = self.data['owner']['rid']
+        self.bridge = bridge
 
         self.reference = light
 
@@ -180,6 +190,21 @@ class Lamp:
     def brightness(self, brightness):
         self.reference.brightness = max(0, min(brightness, 100))
         self.on = True
+
+    @property
+    def colour(self):
+        try:
+            return ('mirek', self.reference.data_dict['color_temperature']['mirek'])
+        except:
+            return ('colour', self.reference.color_xy)
+    
+    @colour.setter
+    def colour(self, value: int):
+        # self.reference.color_xy = value
+        try:
+            self.reference._set('color_temperature', { 'mirek': value })
+        except:
+            self.reference.color_xy = value
 
     @property
     def on(self):
@@ -197,5 +222,8 @@ class Lamp:
             'name': self.name,
             'id': self.id,
             'on': self.on,
-            'brightness': self.brightness
+            'brightness': self.brightness,
+            'colour': self.colour,
+            'data': self.reference.data_dict,
+            'bridge': self.bridge.bridge.ip_address,
         }
