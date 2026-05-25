@@ -7,8 +7,7 @@ import io
 from enum import StrEnum
 import logging
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+from systems.telegram import send_to_telegram, build_menu_keyboard, start, menu_callback, global_debug_inspector, error_handler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -51,9 +50,7 @@ BOT_TOKEN = os.environ['BOT_TOKEN']
 BOT_TOPIC = os.environ['BOT_NAME']
 
 FRIGATE_CAMERAS = os.environ['FRIGATE_CAMERAS'].split(',')
-ALLOWED_USERS = [int(uid.strip()) for uid in os.environ['ALLOWED_USERS'].split(',')]
 
-user_prefs_cache = {user_id: {cam: False for cam in FRIGATE_CAMERAS} for user_id in ALLOWED_USERS}
 mqttc = None
 mqtts = None
 
@@ -64,32 +61,13 @@ doorbell_settings = {
                                   'auth': requests.auth.HTTPDigestAuth(VOORDEUR_ACCOUNT, VOORDEUR_PASSWORD)}
 }
 
-def send_to_telegram(image_bytes, camera_name):
-    target_chat_ids = []
-
-    logger.info(f"{user_prefs_cache=}")
-
-    logger.info(f"{ALLOWED_USERS=}")
-
-    logger.info(f"{camera_name=}")
-
-    for user_id, camera_settings in user_prefs_cache.items():
-        if user_id in ALLOWED_USERS and camera_settings.get(camera_name, False):
-            target_chat_ids.append(user_id)
-
-    logger.info(f"{target_chat_ids=}")
-
-    url =  f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
-
-    for chat_id in target_chat_ids:
-        files = {'photo': ('snapshot.jpg', io.BytesIO(image_bytes), 'image/jpeg')}
-        data = {'chat_id': chat_id, 'caption': f"Person detected on {camera_name}"}
+class NotificationSystem:
+    def __init__(self):
+        self.allowed_users = [int(uid.strip()) for uid in os.environ['ALLOWED_USERS'].split(',')]
+        self.user_prefs_cache = {user_id: {cam: False for cam in FRIGATE_CAMERAS} for user_id in self.allowed_users}
         
-        try:
-            response = requests.post(url, files=files, data=data)
-            print(f"Sent snapshot from {camera_name}: {response.status_code}")
-        except Exception as e:
-            print(f"Error sending to Telegram: {e}")
+
+notification_system = NotificationSystem()
 
 def get_snapshot(location):
     r = requests.get(doorbell_settings[location]['endpoint'], auth=doorbell_settings[location]['auth'])
@@ -108,7 +86,7 @@ def notify_person(msg):
         logger.error(f"A critical error occurred: {e}", exc_info=True)
     
 def get_user_preferences(user_id: int) -> dict:
-    return user_prefs_cache.get(user_id, {cam: False for cam in FRIGATE_CAMERAS})
+    return notification_system.user_prefs_cache.get(user_id, {cam: False for cam in FRIGATE_CAMERAS})
 
 def toggle_camera_pref(user_id: int, camera: str):
     prefs = get_user_preferences(user_id)
@@ -119,74 +97,6 @@ def toggle_camera_pref(user_id: int, camera: str):
 
     mqttc.publish(topic, payload=new_payload, qos=1, retain=True)
 
-def build_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
-    prefs = get_user_preferences(user_id)
-    keyboard = []
-    for cam in FRIGATE_CAMERAS:
-        status_emoji = "🔔 ON" if prefs.get(cam, False) else "🔕 OFF"
-        button_text = f"{cam.replace('_', ' ').title()}: {status_emoji}"
-        keyboard.append([InlineKeyboardButton(button_text, callback_data=f"toggle_{cam}")])
-    return InlineKeyboardMarkup(keyboard)
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.debug(f"Start command received: {update.effective_user.username} ({update.effective_user.id})")
-    user_id = update.effective_user.id
-
-    if user_id not in ALLOWED_USERS:
-        await update.message.reply_text("❌ Unauthorized access.")
-        return
-
-    await update.message.reply_text(
-        "👋 Manage your Frigate notification settings:",
-        reply_markup=build_menu_keyboard(user_id)
-    )
-
-async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.debug(f"{update=}")
-    query = update.callback_query
-    user_id = query.from_user.id
-    
-    if user_id not in ALLOWED_USERS:
-        await query.answer("Unauthorized.", show_alert=True)
-        return
-
-    await query.answer()
-
-    if query.data.startswith("toggle_"):
-        camera_to_toggle = query.data.split("toggle_")[1]
-        
-        if user_id not in user_prefs_cache:
-            user_prefs_cache[user_id] = {cam: False for cam in FRIGATE_CAMERAS}
-            
-        current_state = user_prefs_cache[user_id].get(camera_to_toggle, False)
-        new_state = not current_state
-        user_prefs_cache[user_id][camera_to_toggle] = new_state
-        
-        await query.edit_message_reply_markup(reply_markup=build_menu_keyboard(user_id))
-        
-        payload = "1" if new_state else "0"
-        topic = f"{BOT_TOPIC}/bot/users/{user_id}/cameras/{camera_to_toggle}"
-        
-        #mqttc.publish(topic, payload=payload, qos=1, retain=True)
-        if mqttc and mqttc.is_connected():
-            mqttc.publish(topic, payload=payload, qos=1, retain=True)
-            logger.info(f"📤 Sent retain preference to MQTT topic: {topic} -> {payload}")
-        else:
-            logger.error("❌ Primary MQTT client is offline. Configuration state could not be sent.")
-
-from telegram.ext import MessageHandler, filters
-
-async def global_debug_inspector(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Intercepts absolutely any incoming message text for verification"""
-    logger.info("========================================")
-    logger.info(f"🚨 RAW UPDATE RECEIVED!")
-    logger.info(f"User Text: {update.message.text if update.message else 'No Text'}")
-    logger.info(f"User Object: {update.effective_user}")
-    logger.info("========================================")
-
-async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Logs exceptions thrown inside the async worker context to trace failures"""
-    logger.error(f"⚠️ Exception occurred inside Telegram framework core: {context.error}", exc_info=context.error)
 
 def doorbell(msg):
     payload = json.loads(msg.payload.decode())
@@ -217,10 +127,10 @@ def on_message(client, userdata, msg):
             camera = parts[5]
             enabled = msg.payload.decode().strip() == "1"
 
-            if user_id in ALLOWED_USERS and user_id not in user_prefs_cache:
-                user_prefs_cache[user_id] = {cam: False for cam in FRIGATE_CAMERAS}
+            if user_id in notification_system.allowed_users and user_id not in notification_system.user_prefs_cache:
+                notification_system.user_prefs_cache[user_id] = {cam: False for cam in FRIGATE_CAMERAS}
 
-            user_prefs_cache[user_id][camera] = enabled
+            notification_system.user_prefs_cache[user_id][camera] = enabled
             logger.debug(f"Cache updated via MQTT: User {user_id} -> {camera} = {enabled}")
         except Exception as e:
             logger.error(f"Error parsing bot preference topic: {e}")
@@ -242,7 +152,7 @@ def on_message_second(client, userdata, msg):
 
     parts = msg.topic.split('/')
     camera_name = parts[1]
-    send_to_telegram(msg.payload, camera_name)
+    send_to_telegram(notification_system, msg.payload, camera_name)
 
 logger.info('init')
 
