@@ -110,36 +110,6 @@ class System:
 
 system = System()
 
-
-
-
-
-
-
-
-
-def notify_person(msg):
-    logger.debug(f"Person payload: {msg.payload}")
-    try:
-        requests.put(f"https://ntfy.sh/{DOORBELL_TOPIC}", data=msg.payload, headers={"Filename": "snapshot.jpg", "ContentType": "image/jpeg"})
-    except Exception as e:
-        logger.error(f"A critical error occurred: {e}", exc_info=True)
-    
-
-
-
-
-
-# def doorbell(msg):
-#     payload = json.loads(msg.payload.decode())
-#     location = DoorBellLocation(payload['Data']['UserID'])
-
-#     fn = get_snapshot(location, doorbell_settings[location]['endpoint'], doorbell_settings[location]['auth'])
-
-#     requests.put(f'https://ntfy.sh/{DOORBELL_TOPIC}',
-#         data=open(fn, 'rb'),
-#         headers={ "Filename": fn })
-
 # def doorbell(msg):
 #     requests.post(f'http://{settings["loxone_server"]}/dev/sps/io/mqtt_deurbel_gaat/1')
 
@@ -180,7 +150,6 @@ def on_connect_second(client, userdata, flags, reason_code, properties):
 
 def on_message_second(client, userdata, msg):
     logger.info("Person detected: " + msg.topic)
-    #notify_person(msg)
 
     parts = msg.topic.split('/')
     camera_name = parts[1]
