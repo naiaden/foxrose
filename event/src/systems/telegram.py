@@ -28,14 +28,6 @@ def send_to_telegram(notification_system, image_bytes, camera_name):
         except Exception as e:
             print(f"Error sending to Telegram: {e}")
 
-# def build_menu_keyboard(user_id: int) -> InlineKeyboardMarkup:
-#     prefs = get_user_preferences(user_id)
-#     keyboard = []
-#     for cam in FRIGATE_CAMERAS:
-#         status_emoji = "🔔 ON" if prefs.get(cam, False) else "🔕 OFF"
-#         button_text = f"{cam.replace('_', ' ').title()}: {status_emoji}"
-#         keyboard.append([InlineKeyboardButton(button_text, callback_data=f"toggle_{cam}")])
-#     return InlineKeyboardMarkup(keyboard)
 class FoxRoseHandler:
     def __init__(self, system):
         self.system = system
@@ -48,14 +40,14 @@ class FoxRoseHandler:
 
         # 2. Rows for Detection Notifications (Dynamic Toggles)
         notification_row = []
-        for cam in self.system.camera_system.cameras:
+        for cam in self.system.camera_system.captured_cameras:
             status_emoji = "🔔" if self.system.notification_system.get_user_preference(user_id, cam) else "🔕"
             cam_label = cam.title()
             notification_row.append(f"{status_emoji} Notif: {cam_label}")
         keyboard.append(notification_row)
 
         # 3. Rows for Snapshots
-        snapshot_row = [f"📸 Snap: {cam.title()}" for cam in self.system.camera_system.cameras]
+        snapshot_row = [f"📸 Snap: {cam.title()}" for cam in self.system.camera_systemcaptured_.cameras]
         keyboard.append(snapshot_row)
 
         # Return ReplyKeyboardMarkup instead of Inline

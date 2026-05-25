@@ -29,18 +29,6 @@ def doorcard(msg):
         requests.post(f'http://{LIGHTAPI_SERVER}:8555/home/active/toggle')
 
 
-class DoorBellLocation(StrEnum):
-    ACHTERDEUR = "9901"
-    VOORDEUR = "9903"
-
-ACHTERDEUR_IP = os.environ['ACHTERDEUR_IP']
-ACHTERDEUR_ACCOUNT = os.environ['ACHTERDEUR_ACCOUNT']
-ACHTERDEUR_PASSWORD = os.environ['ACHTERDEUR_PASSWORD']
-
-VOORDEUR_IP = os.environ['VOORDEUR_IP']
-VOORDEUR_ACCOUNT = os.environ['VOORDEUR_ACCOUNT']
-VOORDEUR_PASSWORD = os.environ['VOORDEUR_PASSWORD']
-
 DOORBELL_TOPIC = os.environ['DOORBELL_TOPIC']
 MQTT_SERVER = os.environ['mqtt_server']
 MQTT_SERVER_SECOND = os.environ['mqtt_server_second']
@@ -48,21 +36,35 @@ LIGHTAPI_SERVER = os.environ['lightapi_server']
 VALID_DOORCARDS = os.environ['VALID_DOORCARDS'].split(',')
 
 BOT_TOKEN = os.environ['BOT_TOKEN']
-BOT_TOPIC = os.environ['BOT_NAME']
 
 mqttc = None
 mqtts = None
 
-doorbell_settings = {
-    DoorBellLocation.ACHTERDEUR: {'endpoint': f'http://{ACHTERDEUR_IP}/cgi-bin/snapshot.cgi', 
-                                  'auth': requests.auth.HTTPDigestAuth(ACHTERDEUR_ACCOUNT, ACHTERDEUR_PASSWORD)},
-    DoorBellLocation.VOORDEUR: {'endpoint': f'http://{VOORDEUR_IP}/cgi-bin/snapshot.cgi', 
-                                  'auth': requests.auth.HTTPDigestAuth(VOORDEUR_ACCOUNT, VOORDEUR_PASSWORD)}
-}
 
 class CameraSystem:
+
+    class Camera:
+        def __init__(self, name, ip, account, password):
+            self.name = name
+            self.ip = ip
+            self.account = account
+            self.password = password
+
+    class Doorbell(Camera):
+        def __init__(self, name, ip, account, password, location):
+            super().__init__(name, ip, account, password)
+            self.location = location
+
+            self.endpoint = f'http://{self.ip}/cgi-bin/snapshot.cgi'
+            self.auth = requests.auth.HTTPDigestAuth(account, password)
+
     def __init__(self):
-        self.cameras = os.environ['FRIGATE_CAMERAS'].split(',')
+        self.captured_cameras = os.environ['FRIGATE_CAMERAS'].split(',')
+        self.cameras = [
+            # Camera("tuinhuis", )
+            Doorbell("achterdeur", os.environ['ACHTERDEUR_IP'], os.environ['ACHTERDEUR_ACCOUNT'], os.environ['ACHTERDEUR_PASSWORD'], "9901"),
+            Doorbell("voordeur", os.environ['VOORDEUR_IP'], os.environ['VOORDEUR_ACCOUNT'], os.environ['VOORDEUR_PASSWORD'], "9903"),
+        ]
 
 class NotificationSystem:
 
@@ -77,7 +79,7 @@ class NotificationSystem:
                       Mode("Away", "🧳 Away"), 
                       Mode("At Home", "🏠 At Home"), 
                       Mode("All", "🌐 All")]
-        self.mqtt_topic = os.environ['BOT_TOPIC']
+        self.mqtt_topic = os.environ['BOT_NAME']
         self.mqtt_publish_server = mqttc
 
     
@@ -103,7 +105,7 @@ class System:
 
         self.camera_system = CameraSystem()
 
-        self.notification_system = NotificationSystem(self.allowed_users, self.camera_system.cameras)
+        self.notification_system = NotificationSystem(self.allowed_users, self.camera_system.captured_cameras)
 
 
 system = System()
@@ -128,15 +130,15 @@ def notify_person(msg):
 
 
 
-def doorbell(msg):
-    payload = json.loads(msg.payload.decode())
-    location = DoorBellLocation(payload['Data']['UserID'])
+# def doorbell(msg):
+#     payload = json.loads(msg.payload.decode())
+#     location = DoorBellLocation(payload['Data']['UserID'])
 
-    fn = get_snapshot(location, doorbell_settings[location]['endpoint'], doorbell_settings[location]['auth'])
+#     fn = get_snapshot(location, doorbell_settings[location]['endpoint'], doorbell_settings[location]['auth'])
 
-    requests.put(f'https://ntfy.sh/{DOORBELL_TOPIC}',
-        data=open(fn, 'rb'),
-        headers={ "Filename": fn })
+#     requests.put(f'https://ntfy.sh/{DOORBELL_TOPIC}',
+#         data=open(fn, 'rb'),
+#         headers={ "Filename": fn })
 
 # def doorbell(msg):
 #     requests.post(f'http://{settings["loxone_server"]}/dev/sps/io/mqtt_deurbel_gaat/1')
@@ -145,12 +147,12 @@ def on_connect(client, userdata, flags, reason_code, properties):
     logger.info(f"Connected to main with result code {reason_code}")
     client.subscribe("DahuaVTO/DoorCard/Event/#") 
     client.subscribe("DahuaVTO/Invite/Event/#") 
-    client.subscribe(f"{BOT_TOPIC}/bot/users/+/cameras/+")
+    client.subscribe(f"{system.notification_system.mqtt_topic}/bot/users/+/cameras/+")
 
 def on_message(client, userdata, msg):
     logger.info(msg.topic+" "+str(msg.payload))
 
-    if msg.topic.startswith("{BOT_TOPIC}/bot/users/"):
+    if msg.topic.startswith(f"{system.notification_system.mqtt_topic}/bot/users/"):
         try:
             parts = msg.topic.split("/")
             user_id = int(parts[3])
@@ -182,7 +184,7 @@ def on_message_second(client, userdata, msg):
 
     parts = msg.topic.split('/')
     camera_name = parts[1]
-    send_to_telegram(notification_system, msg.payload, camera_name)
+    send_to_telegram(system.notification_system, msg.payload, camera_name)
 
 logger.info('init')
 
