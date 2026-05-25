@@ -7,7 +7,8 @@ import io
 from enum import StrEnum
 import logging
 
-from systems.telegram import send_to_telegram, build_menu_keyboard, start, menu_callback, global_debug_inspector, error_handler
+from systems.telegram import send_to_telegram, FoxRoseHandler, global_debug_inspector, error_handler
+from systems.dahua import get_snapshot
 
 logging.basicConfig(
     level=logging.INFO,
@@ -49,8 +50,6 @@ VALID_DOORCARDS = os.environ['VALID_DOORCARDS'].split(',')
 BOT_TOKEN = os.environ['BOT_TOKEN']
 BOT_TOPIC = os.environ['BOT_NAME']
 
-FRIGATE_CAMERAS = os.environ['FRIGATE_CAMERAS'].split(',')
-
 mqttc = None
 mqtts = None
 
@@ -61,22 +60,61 @@ doorbell_settings = {
                                   'auth': requests.auth.HTTPDigestAuth(VOORDEUR_ACCOUNT, VOORDEUR_PASSWORD)}
 }
 
+class CameraSystem:
+    def __init__(self):
+        self.cameras = os.environ['FRIGATE_CAMERAS'].split(',')
+
 class NotificationSystem:
+
+    class Mode:
+        def __init__(self, name, label):
+            self.name = name
+            self.label = label
+
+    def __init__(self, users, cameras):
+        self.user_prefs_cache = {user_id: {cam: False for cam in cameras} for user_id in users}
+        self.modes = [Mode("night", "🌙 Night"), 
+                      Mode("Away", "🧳 Away"), 
+                      Mode("At Home", "🏠 At Home"), 
+                      Mode("All", "🌐 All")]
+        self.mqtt_topic = os.environ['BOT_TOPIC']
+        self.mqtt_publish_server = mqttc
+
+    
+    def get_user_preferences(self, user_id: int) -> dict:
+        return self.user_prefs_cache[user_id]
+
+    def get_user_preference(self, user_id:int, camera:str) -> bool:
+        return self.user_prefs_cache[user_id].get(camera, False)
+
+    def set_user_preference(self, user_id: int, camera: str, value: bool):
+        self.user_prefs_cache[user_id][camera] = value
+
+    def publish_retained(self, topic, payload):
+        if self.mqtt_publish_server and self.mqtt_publish_server.is_connected():
+            self.mqtt_publish_server.publish(topic, payload=payload, qos=1, retain=True)
+            logger.info(f"📤 Sent retain preference to MQTT topic: {topic} -> {payload}")
+        else:
+            logger.error("❌ Primary MQTT client is offline. Configuration state could not be sent.")
+
+class System:
     def __init__(self):
         self.allowed_users = [int(uid.strip()) for uid in os.environ['ALLOWED_USERS'].split(',')]
-        self.user_prefs_cache = {user_id: {cam: False for cam in FRIGATE_CAMERAS} for user_id in self.allowed_users}
-        
 
-notification_system = NotificationSystem()
+        self.camera_system = CameraSystem()
 
-def get_snapshot(location):
-    r = requests.get(doorbell_settings[location]['endpoint'], auth=doorbell_settings[location]['auth'])
-    logger.debug(r)
+        self.notification_system = NotificationSystem(self.allowed_users, self.camera_system.cameras)
 
-    with open(fn := f'{location}-{datetime.datetime.now()}.jpg', 'wb') as f:
-        f.write(r.content)
 
-    return fn
+system = System()
+
+
+
+
+
+
+
+
 
 def notify_person(msg):
     logger.debug(f"Person payload: {msg.payload}")
@@ -85,24 +123,16 @@ def notify_person(msg):
     except Exception as e:
         logger.error(f"A critical error occurred: {e}", exc_info=True)
     
-def get_user_preferences(user_id: int) -> dict:
-    return notification_system.user_prefs_cache.get(user_id, {cam: False for cam in FRIGATE_CAMERAS})
 
-def toggle_camera_pref(user_id: int, camera: str):
-    prefs = get_user_preferences(user_id)
-    current_state = prefs.get(camera, False)
 
-    new_payload = "1" if not current_state else "0"
-    topic = f"{BOT_TOPIC}/bot/users/{user_id}/cameras/{camera}"
 
-    mqttc.publish(topic, payload=new_payload, qos=1, retain=True)
 
 
 def doorbell(msg):
     payload = json.loads(msg.payload.decode())
     location = DoorBellLocation(payload['Data']['UserID'])
 
-    fn = get_snapshot(location)
+    fn = get_snapshot(location, doorbell_settings[location]['endpoint'], doorbell_settings[location]['auth'])
 
     requests.put(f'https://ntfy.sh/{DOORBELL_TOPIC}',
         data=open(fn, 'rb'),
@@ -127,10 +157,10 @@ def on_message(client, userdata, msg):
             camera = parts[5]
             enabled = msg.payload.decode().strip() == "1"
 
-            if user_id in notification_system.allowed_users and user_id not in notification_system.user_prefs_cache:
-                notification_system.user_prefs_cache[user_id] = {cam: False for cam in FRIGATE_CAMERAS}
+            # if user_id in notification_system.allowed_users and user_id not in notification_system.user_prefs_cache:
+            #     notification_system.user_prefs_cache[user_id] = {cam: False for cam in FRIGATE_CAMERAS}
 
-            notification_system.user_prefs_cache[user_id][camera] = enabled
+            notification_system.set_user_preference(user_id, camera, enabled)
             logger.debug(f"Cache updated via MQTT: User {user_id} -> {camera} = {enabled}")
         except Exception as e:
             logger.error(f"Error parsing bot preference topic: {e}")
@@ -165,10 +195,11 @@ mqtts = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 mqtts.on_connect = on_connect_second
 mqtts.on_message = on_message_second
 
+
+bot_handler = FoxRoseHandler(system=system)
 application = Application.builder().token(BOT_TOKEN).build()
-application.add_handler(CommandHandler("camera", start))
-application.add_handler(MessageHandler(filters.ALL, global_debug_inspector))
-application.add_handler(CallbackQueryHandler(menu_callback))
+application.add_handler(CommandHandler("start", bot_handler.start))
+application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot_handler.handle_keyboard_clicks))
 application.add_error_handler(error_handler)
 
 
