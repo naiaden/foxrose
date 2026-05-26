@@ -2,6 +2,7 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
 import logging
+import requests
 
 import io
 
@@ -16,6 +17,7 @@ BOT_TOKEN = os.environ['BOT_TOKEN']
 logger = logging.getLogger(__name__)
 
 def send_to_telegram(chat_id, image_bytes, camera_name):
+    logger.info(f"{chat_id=}, {camera_name=}")
 
     url =  f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
 
@@ -25,13 +27,21 @@ def send_to_telegram(chat_id, image_bytes, camera_name):
     
     try:
         response = requests.post(url, files=files, data=data)
-        print(f"Sent snapshot from {camera_name}: {response.status_code}")
+        logging.info(f"Sent snapshot from {camera_name}: {response.status_code}")
     except Exception as e:
-        print(f"Error sending to Telegram: {e}")
+        logging.error(f"Error sending to Telegram: {e}")
 
 class FoxRoseHandler:
     def __init__(self, system):
         self.system = system
+
+        self.application = Application.builder().token(BOT_TOKEN).build()
+        self.application.add_handler(CommandHandler("start", self.start))
+        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_keyboard_clicks))
+        self.application.add_error_handler(error_handler)
+
+    def run(self):
+        self.application.run_polling(drop_pending_updates=True)
 
     def build_persistent_keyboard(self, user_id: int) -> ReplyKeyboardMarkup:
         keyboard = []
@@ -51,12 +61,31 @@ class FoxRoseHandler:
         snapshot_row = [f"📸 Snap: {cam.title()}" for cam in self.system.camera_system.captured_cameras]
         keyboard.append(snapshot_row)
 
+        # 4. Row for Snooze
+        is_snoozed = self.system.notification_system.is_user_snoozed(user_id)
+        snooze_label = "⏰ Unsnooze" if is_snoozed else "💤 Snooze Notifications"
+        keyboard.append([snooze_label])
+
+
         # Return ReplyKeyboardMarkup instead of Inline
         return ReplyKeyboardMarkup(
             keyboard, 
             resize_keyboard=True,          # Makes buttons fit neatly on screen
             one_time_keyboard=False,       # Keeps the keyboard persistent
             input_field_placeholder="Select an option below..." # Tells them not to type
+        )
+ 
+
+    def build_snooze_duration_keyboard(self) -> ReplyKeyboardMarkup:
+        keyboard = [
+            ["⏳ 15 Mins", "⏳ 1 Hour"],
+            ["⏳ 3 Hours", "⏳ 8 Hours"],
+            ["❌ Cancel"]
+        ]
+        return ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True,
+            one_time_keyboard=True # Automatically hides after they click one
         )
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -97,11 +126,6 @@ class FoxRoseHandler:
             # Pull preferences and invert the boolean
             new_state = not self.system.notification_system.get_user_preference(user_id, camera_to_toggle)
             self.system.notification_system.set_user_preference(user_id, camera_to_toggle, new_state)
-            
-            # Publish to MQTT 
-            payload = "1" if new_state else "0"
-            topic = f"{self.system.notification_system.mqtt_topic}/bot/users/{user_id}/cameras/{camera_to_toggle}"
-            self.system.notification_system.publish_retained(topic, payload)
 
             # Update the user interface keyboard immediately with the new emoji
             await update.message.reply_text(
@@ -118,6 +142,40 @@ class FoxRoseHandler:
             await update.message.reply_text(f"⏳ Fetching snapshot for {cam_title}...")
             # TODO: Grab your image from Frigate API and send it:
             # await context.bot.send_photo(chat_id=user_id, photo=open('snap.jpg', 'rb'))
+            return
+        
+        elif text == "💤 Snooze Notifications":
+            await update.message.reply_text(
+                "How long would you like to snooze notifications for?",
+                reply_markup=self.build_snooze_duration_keyboard()
+            )
+            return
+        
+        # User picked a duration
+        elif text.startswith("⏳"):
+            # Extract duration (e.g., "15 Mins" or "1 Hour")
+            duration_text = text.replace("⏳ ", "")
+            
+            if duration_text == "15 Mins": duration = 15*60
+            elif duration_text == "1 Hour": duration = 60*60
+            elif duration_text == "3 Hours": duration = 3*60*60
+            elif duration_text == "8 Hours": duration = 8*60*60
+
+            self.system.notification_system.set_user_snooze(user_id, duration)
+
+            await update.message.reply_text(
+                f"Notifications snoozed for {duration_text}.",
+                reply_markup=self.build_persistent_keyboard(user_id) # Bring back main menu
+            )
+            return
+        
+        # User wants to Unsnooze or Cancel
+        elif text in ["⏰ Unsnooze", "❌ Cancel"]:
+            self.system.notification_system.reset_user_snooze(user_id)
+            await update.message.reply_text(
+                "Back to normal mode.",
+                reply_markup=self.build_persistent_keyboard(user_id)
+            )
             return
 
     async def menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

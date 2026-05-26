@@ -68,6 +68,8 @@ class CameraSystem:
             self.Doorbell("voordeur", os.environ['VOORDEUR_IP'], os.environ['VOORDEUR_ACCOUNT'], os.environ['VOORDEUR_PASSWORD'], "9903"),
         ]
 
+import time
+
 class NotificationSystem:
 
     class Mode:
@@ -77,6 +79,7 @@ class NotificationSystem:
 
     def __init__(self, users, cameras, publish_client):
         self.user_prefs_cache = {user_id: {cam: False for cam in cameras} for user_id in users}
+        self.user_snoozed_until = {user_id: 0 for user_id in users}
         self.modes = [self.Mode("night", "🌙 Night"), 
                       self.Mode("Away", "🧳 Away"), 
                       self.Mode("At Home", "🏠 At Home"), 
@@ -92,9 +95,29 @@ class NotificationSystem:
         return self.user_prefs_cache[user_id].get(camera, False)
 
     def set_user_preference(self, user_id: int, camera: str, value: bool):
-        self.user_prefs_cache[user_id][camera] = value
+        current_value = self.get_user_preference(user_id, camera)
 
-    def publish_retained(self, topic, payload):
+        if current_value != value:
+            self.user_prefs_cache[user_id][camera] = value
+
+            topic = f"{self.mqtt_topic}/bot/users/{user_id}/cameras/{camera}"
+            payload = "1" if value else "0"
+            self._publish_retained(topic, payload)
+
+    def is_user_snoozed(self, user_id):
+        if snoozed_until := self.user_snoozed_until[user_id]:
+            return time.time() <= snoozed_until
+    
+    def _set_user_snooze_abs(self, user_id, snooze_time):
+        self.user_snoozed_until[user_id] = snooze_time
+
+    def set_user_snooze(self, user_id, snooze_time):
+        self._set_user_snooze_abs(user_id, time.time() + snooze_time)
+
+    def reset_user_snooze(self, user_id):
+        self._set_user_snooze_abs(user_id, 0)
+
+    def _publish_retained(self, topic, payload):
         if self.mqtt_publish_server and self.mqtt_publish_server.is_connected():
             self.mqtt_publish_server.publish(topic, payload=payload, qos=1, retain=True)
             logger.info(f"📤 Sent retain preference to MQTT topic: {topic} -> {payload}")
@@ -130,10 +153,7 @@ def on_message(client, userdata, msg):
             user_id = int(parts[3])
             camera = parts[5]
             enabled = msg.payload.decode().strip() == "1"
-
-            # if user_id in notification_system.allowed_users and user_id not in notification_system.user_prefs_cache:
-            #     notification_system.user_prefs_cache[user_id] = {cam: False for cam in FRIGATE_CAMERAS}
-
+            
             system.notification_system.set_user_preference(user_id, camera, enabled)
             logger.debug(f"Cache updated via MQTT: User {user_id} -> {camera} = {enabled}")
         except Exception as e:
@@ -158,9 +178,14 @@ def on_message_second(client, userdata, msg):
     
     target_chat_ids = []    
 
+    logger.info(f"{system.notification_system.user_prefs_cache}")
+    
+
     for user_id, camera_settings in system.notification_system.user_prefs_cache.items():
-            if user_id in system.allowed_users and camera_settings:
-                target_chat_ids.append(user_id)
+        logger.info(f"{user_id=}, {camera_settings=}, {system.allowed_users=}, {system.notification_system.is_user_snoozed(user_id)=}")
+        if user_id in system.allowed_users and camera_settings[camera_name] and not system.notification_system.is_user_snoozed(user_id):
+            logger.info(f"{user_id=} added to {target_chat_ids=}")
+            target_chat_ids.append(user_id)
     
     for chat_id in target_chat_ids:
         send_to_telegram(chat_id, msg.payload, camera_name)
@@ -179,12 +204,7 @@ mqtts = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 mqtts.on_connect = on_connect_second
 mqtts.on_message = on_message_second
 
-
-bot_handler = FoxRoseHandler(system=system)
-application = Application.builder().token(BOT_TOKEN).build()
-application.add_handler(CommandHandler("start", bot_handler.start))
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot_handler.handle_keyboard_clicks))
-application.add_error_handler(error_handler)
+bot = FoxRoseHandler(system)
 
 
 logging.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
@@ -202,14 +222,10 @@ try:
     system.notification_system.mqtt_publish_server = mqttc
     logging.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
 
-    application.run_polling(drop_pending_updates=True)
+    bot.run()
 
     logger.info("System running")
 
-
-    #while True:
-    #    import time
-    #    time.sleep(1)
 except Exception as e:
     logger.error(f"A critical error occurred: {e}", exc_info=True)
 
