@@ -7,6 +7,8 @@ import io
 from enum import StrEnum
 import logging
 
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
+
 from systems.telegram import send_to_telegram, FoxRoseHandler, global_debug_inspector, error_handler
 from systems.dahua import get_snapshot
 
@@ -62,8 +64,8 @@ class CameraSystem:
         self.captured_cameras = os.environ['FRIGATE_CAMERAS'].split(',')
         self.cameras = [
             # Camera("tuinhuis", )
-            Doorbell("achterdeur", os.environ['ACHTERDEUR_IP'], os.environ['ACHTERDEUR_ACCOUNT'], os.environ['ACHTERDEUR_PASSWORD'], "9901"),
-            Doorbell("voordeur", os.environ['VOORDEUR_IP'], os.environ['VOORDEUR_ACCOUNT'], os.environ['VOORDEUR_PASSWORD'], "9903"),
+            self.Doorbell("achterdeur", os.environ['ACHTERDEUR_IP'], os.environ['ACHTERDEUR_ACCOUNT'], os.environ['ACHTERDEUR_PASSWORD'], "9901"),
+            self.Doorbell("voordeur", os.environ['VOORDEUR_IP'], os.environ['VOORDEUR_ACCOUNT'], os.environ['VOORDEUR_PASSWORD'], "9903"),
         ]
 
 class NotificationSystem:
@@ -73,14 +75,14 @@ class NotificationSystem:
             self.name = name
             self.label = label
 
-    def __init__(self, users, cameras):
+    def __init__(self, users, cameras, publish_client):
         self.user_prefs_cache = {user_id: {cam: False for cam in cameras} for user_id in users}
-        self.modes = [Mode("night", "🌙 Night"), 
-                      Mode("Away", "🧳 Away"), 
-                      Mode("At Home", "🏠 At Home"), 
-                      Mode("All", "🌐 All")]
+        self.modes = [self.Mode("night", "🌙 Night"), 
+                      self.Mode("Away", "🧳 Away"), 
+                      self.Mode("At Home", "🏠 At Home"), 
+                      self.Mode("All", "🌐 All")]
         self.mqtt_topic = os.environ['BOT_NAME']
-        self.mqtt_publish_server = mqttc
+        self.mqtt_publish_server = publish_client
 
     
     def get_user_preferences(self, user_id: int) -> dict:
@@ -105,7 +107,7 @@ class System:
 
         self.camera_system = CameraSystem()
 
-        self.notification_system = NotificationSystem(self.allowed_users, self.camera_system.captured_cameras)
+        self.notification_system = NotificationSystem(self.allowed_users, self.camera_system.captured_cameras, mqttc)
 
 
 system = System()
@@ -132,7 +134,7 @@ def on_message(client, userdata, msg):
             # if user_id in notification_system.allowed_users and user_id not in notification_system.user_prefs_cache:
             #     notification_system.user_prefs_cache[user_id] = {cam: False for cam in FRIGATE_CAMERAS}
 
-            notification_system.set_user_preference(user_id, camera, enabled)
+            system.notification_system.set_user_preference(user_id, camera, enabled)
             logger.debug(f"Cache updated via MQTT: User {user_id} -> {camera} = {enabled}")
         except Exception as e:
             logger.error(f"Error parsing bot preference topic: {e}")
@@ -153,7 +155,18 @@ def on_message_second(client, userdata, msg):
 
     parts = msg.topic.split('/')
     camera_name = parts[1]
-    send_to_telegram(system.notification_system, msg.payload, camera_name)
+    
+    target_chat_ids = []    
+
+    for user_id, camera_settings in system.notification_system.user_prefs_cache.items():
+            if user_id in system.allowed_users and camera_settings:
+                target_chat_ids.append(user_id)
+    
+    for chat_id in target_chat_ids:
+        send_to_telegram(chat_id, msg.payload, camera_name)
+        
+
+    
 
 logger.info('init')
 
@@ -174,6 +187,8 @@ application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot_hand
 application.add_error_handler(error_handler)
 
 
+logging.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
+
 logger.info(f"{MQTT_SERVER=}")
 logger.info(f"{MQTT_SERVER_SECOND=}")
 logger.info(f"{DOORBELL_TOPIC=}")
@@ -183,6 +198,9 @@ try:
     mqttc.loop_start()
     mqtts.connect(MQTT_SERVER_SECOND, 1883, 60)
     mqtts.loop_start()
+
+    system.notification_system.mqtt_publish_server = mqttc
+    logging.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
 
     application.run_polling(drop_pending_updates=True)
 

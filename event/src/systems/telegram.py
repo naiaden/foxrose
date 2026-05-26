@@ -1,5 +1,9 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
+import os
+import logging
+
+import io
 
 logging.basicConfig(
     level=logging.INFO,
@@ -7,26 +11,23 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 
+BOT_TOKEN = os.environ['BOT_TOKEN']
+
 logger = logging.getLogger(__name__)
 
-def send_to_telegram(notification_system, image_bytes, camera_name):
-    target_chat_ids = []
-
-    for user_id, camera_settings in notification_system.user_prefs_cache.items():
-        if user_id in notification_system.allowed_users and camera_settings.get(camera_name, False):
-            target_chat_ids.append(user_id)
+def send_to_telegram(chat_id, image_bytes, camera_name):
 
     url =  f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
 
-    for chat_id in target_chat_ids:
-        files = {'photo': ('snapshot.jpg', io.BytesIO(image_bytes), 'image/jpeg')}
-        data = {'chat_id': chat_id, 'caption': f"Person detected on {camera_name}"}
-        
-        try:
-            response = requests.post(url, files=files, data=data)
-            print(f"Sent snapshot from {camera_name}: {response.status_code}")
-        except Exception as e:
-            print(f"Error sending to Telegram: {e}")
+
+    files = {'photo': ('snapshot.jpg', io.BytesIO(image_bytes), 'image/jpeg')}
+    data = {'chat_id': chat_id, 'caption': f"Person detected on {camera_name}"}
+    
+    try:
+        response = requests.post(url, files=files, data=data)
+        print(f"Sent snapshot from {camera_name}: {response.status_code}")
+    except Exception as e:
+        print(f"Error sending to Telegram: {e}")
 
 class FoxRoseHandler:
     def __init__(self, system):
@@ -47,7 +48,7 @@ class FoxRoseHandler:
         keyboard.append(notification_row)
 
         # 3. Rows for Snapshots
-        snapshot_row = [f"📸 Snap: {cam.title()}" for cam in self.system.camera_systemcaptured_.cameras]
+        snapshot_row = [f"📸 Snap: {cam.title()}" for cam in self.system.camera_system.captured_cameras]
         keyboard.append(snapshot_row)
 
         # Return ReplyKeyboardMarkup instead of Inline
@@ -68,7 +69,7 @@ class FoxRoseHandler:
 
         await update.message.reply_text(
             "👋 Manage your Frigate notification settings:",
-            reply_markup=build_menu_keyboard(user_id)
+            reply_markup=self.build_persistent_keyboard(user_id)
         )
 
     async def handle_keyboard_clicks(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -105,7 +106,7 @@ class FoxRoseHandler:
             # Update the user interface keyboard immediately with the new emoji
             await update.message.reply_text(
                 f"Updated notification settings for {cam_title}.",
-                reply_markup=build_persistent_keyboard(user_id)
+                reply_markup=self.build_persistent_keyboard(user_id)
             )
             return
 
@@ -140,7 +141,7 @@ class FoxRoseHandler:
             new_state = not current_state
             user_prefs_cache[user_id][camera_to_toggle] = new_state
             
-            await query.edit_message_reply_markup(reply_markup=build_menu_keyboard(user_id))
+            await query.edit_message_reply_markup(reply_markup=self.build_persistent_keyboard(user_id))
             
             payload = "1" if new_state else "0"
             topic = f"{BOT_TOPIC}/bot/users/{user_id}/cameras/{camera_to_toggle}"
