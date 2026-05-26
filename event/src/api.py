@@ -2,15 +2,11 @@ import paho.mqtt.client as mqtt
 import json
 import requests
 import os
-import datetime
-import io
-from enum import StrEnum
 import logging
-
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
-
+from enum import Enum 
 from systems.telegram import send_to_telegram, FoxRoseHandler, global_debug_inspector, error_handler
 from systems.dahua import get_snapshot
+from modes import Mode
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,6 +26,37 @@ def doorcard(msg):
         print("LAMPJES")
         requests.post(f'http://{LIGHTAPI_SERVER}:8555/home/active/toggle')
 
+
+def from_bot(msg):
+    try:
+        parts = msg.topic.split("/")
+        user_id = int(parts[3])
+        camera = parts[5]
+        enabled = msg.payload.decode().strip() == "1"
+
+        system.notification_system.set_user_preference(user_id, camera, enabled)
+        logger.debug(f"Cache updated via MQTT: User {user_id} -> {camera} = {enabled}")
+    except Exception as e:
+        logger.error(f"Error parsing bot preference topic: {e}")
+    return
+
+def person_detected(msg):
+    parts = msg.topic.split('/')
+    camera_name = parts[1]
+    
+    target_chat_ids = []    
+
+    logger.info(f"{system.notification_system.user_prefs_cache}")
+    
+
+    for user_id, camera_settings in system.notification_system.user_prefs_cache.items():
+        logger.info(f"{user_id=}, {camera_settings=}, {system.allowed_users=}, {system.notification_system.is_user_snoozed(user_id)=}")
+        if user_id in system.allowed_users and camera_settings[camera_name] and not system.notification_system.is_user_snoozed(user_id):
+            logger.info(f"{user_id=} added to {target_chat_ids=}")
+            target_chat_ids.append(user_id)
+    
+    for chat_id in target_chat_ids:
+        send_to_telegram(chat_id, msg.payload, camera_name)
 
 DOORBELL_TOPIC = os.environ['DOORBELL_TOPIC']
 MQTT_SERVER = os.environ['mqtt_server']
@@ -70,24 +97,25 @@ class CameraSystem:
 
 import time
 
+
+
 class NotificationSystem:
 
-    class Mode:
-        def __init__(self, name, label):
-            self.name = name
-            self.label = label
-
     def __init__(self, users, cameras, publish_client):
+
         self.user_prefs_cache = {user_id: {cam: False for cam in cameras} for user_id in users}
         self.user_snoozed_until = {user_id: 0 for user_id in users}
-        self.modes = [self.Mode("night", "🌙 Night"), 
-                      self.Mode("Away", "🧳 Away"), 
-                      self.Mode("At Home", "🏠 At Home"), 
-                      self.Mode("All", "🌐 All")]
+        self.user_mode = {user_id: Mode.STANDARD for user_id in users}
+        
         self.mqtt_topic = os.environ['BOT_NAME']
         self.mqtt_publish_server = publish_client
 
-    
+    def get_user_mode(self, user_id) -> Mode:
+        return self.user_mode[user_id]
+
+    def set_user_mode(self, user_id, mode):
+        self.user_mode[user_id] = mode
+
     def get_user_preferences(self, user_id: int) -> dict:
         return self.user_prefs_cache[user_id]
 
@@ -148,17 +176,7 @@ def on_message(client, userdata, msg):
     logger.info(msg.topic+" "+str(msg.payload))
 
     if msg.topic.startswith(f"{system.notification_system.mqtt_topic}/bot/users/"):
-        try:
-            parts = msg.topic.split("/")
-            user_id = int(parts[3])
-            camera = parts[5]
-            enabled = msg.payload.decode().strip() == "1"
-            
-            system.notification_system.set_user_preference(user_id, camera, enabled)
-            logger.debug(f"Cache updated via MQTT: User {user_id} -> {camera} = {enabled}")
-        except Exception as e:
-            logger.error(f"Error parsing bot preference topic: {e}")
-        return
+        from_bot(msg)
 
     match msg.topic:
         case "DahuaVTO/DoorCard/Event":
@@ -173,22 +191,9 @@ def on_connect_second(client, userdata, flags, reason_code, properties):
 def on_message_second(client, userdata, msg):
     logger.info("Person detected: " + msg.topic)
 
-    parts = msg.topic.split('/')
-    camera_name = parts[1]
-    
-    target_chat_ids = []    
+    person_detected(msg)
 
-    logger.info(f"{system.notification_system.user_prefs_cache}")
     
-
-    for user_id, camera_settings in system.notification_system.user_prefs_cache.items():
-        logger.info(f"{user_id=}, {camera_settings=}, {system.allowed_users=}, {system.notification_system.is_user_snoozed(user_id)=}")
-        if user_id in system.allowed_users and camera_settings[camera_name] and not system.notification_system.is_user_snoozed(user_id):
-            logger.info(f"{user_id=} added to {target_chat_ids=}")
-            target_chat_ids.append(user_id)
-    
-    for chat_id in target_chat_ids:
-        send_to_telegram(chat_id, msg.payload, camera_name)
         
 
     

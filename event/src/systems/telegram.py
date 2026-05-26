@@ -3,6 +3,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 import os
 import logging
 import requests
+from modes import Mode
 
 import io
 
@@ -47,7 +48,7 @@ class FoxRoseHandler:
         keyboard = []
 
         # 1. Row for Modes
-        keyboard.append([mode.label for mode in self.system.notification_system.modes])
+        keyboard.append([mode.label for mode in Mode])
 
         # 2. Rows for Detection Notifications (Dynamic Toggles)
         notification_row = []
@@ -110,11 +111,11 @@ class FoxRoseHandler:
             return
 
         # --- HANDLE MODES ---
-        if text in ["🌙 Night", "🧳 Away", "🏠 At Home", "🌐 All"]:
-            mode_selected = text.split(" ")[1].lower()
-            # TODO: Publish your mode to MQTT here
-            logger.info(f"User {user_id} set mode to {mode_selected}")
-            await update.message.reply_text(f"✅ Mode changed to: {text}")
+        if text in (mode.label for mode in Mode):
+            mode = Mode.from_label(text)
+            logger.info(f"User {user_id} set mode to {mode.display_name}")
+            self.system.notification_system.set_user_mode(user_id, mode)
+            await update.message.reply_text(f"✅ Mode changed to: {mode.display_name}")
             return
 
         # --- HANDLE NOTIFICATION TOGGLES ---
