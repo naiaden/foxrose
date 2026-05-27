@@ -5,6 +5,8 @@ import logging
 import requests
 from modes import Mode
 
+from events import UserModeToggleEvent
+
 import io
 
 logging.basicConfig(
@@ -114,7 +116,7 @@ class FoxRoseHandler:
         if text in (mode.label for mode in Mode):
             mode = Mode.from_label(text)
             logger.info(f"User {user_id} set mode to {mode.display_name}")
-            self.system.notification_system.set_user_mode(user_id, mode)
+            UserModeToggleEvent(user_id, mode).handle(self.system)
             await update.message.reply_text(f"✅ Mode changed to: {mode.display_name}")
             return
 
@@ -126,7 +128,7 @@ class FoxRoseHandler:
             
             # Pull preferences and invert the boolean
             new_state = not self.system.notification_system.get_user_preference(user_id, camera_to_toggle)
-            self.system.notification_system.set_user_preference(user_id, camera_to_toggle, new_state)
+            UserSettingsChangedEvent(user_id, UserSettingsType.CAMERA_PREFERENCE, camera_to_toggle, new_state).handle(self.system)
 
             # Update the user interface keyboard immediately with the new emoji
             await update.message.reply_text(
@@ -156,13 +158,7 @@ class FoxRoseHandler:
         elif text.startswith("⏳"):
             # Extract duration (e.g., "15 Mins" or "1 Hour")
             duration_text = text.replace("⏳ ", "")
-            
-            if duration_text == "15 Mins": duration = 15*60
-            elif duration_text == "1 Hour": duration = 60*60
-            elif duration_text == "3 Hours": duration = 3*60*60
-            elif duration_text == "8 Hours": duration = 8*60*60
-
-            self.system.notification_system.set_user_snooze(user_id, duration)
+            UserSnoozeEvent(user_id, duration_text).handle(self.system)
 
             await update.message.reply_text(
                 f"Notifications snoozed for {duration_text}.",
@@ -172,45 +168,14 @@ class FoxRoseHandler:
         
         # User wants to Unsnooze or Cancel
         elif text in ["⏰ Unsnooze", "❌ Cancel"]:
-            self.system.notification_system.reset_user_snooze(user_id)
+            UserSnoozeEvent(user_id, None).handle(self.system)
             await update.message.reply_text(
                 "Back to normal mode.",
                 reply_markup=self.build_persistent_keyboard(user_id)
             )
             return
 
-    async def menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        logger.debug(f"{update=}")
-        query = update.callback_query
-        user_id = query.from_user.id
-        
-        if user_id not in ALLOWED_USERS:
-            await query.answer("Unauthorized.", show_alert=True)
-            return
-
-        await query.answer()
-
-        if query.data.startswith("toggle_"):
-            camera_to_toggle = query.data.split("toggle_")[1]
-            
-            if user_id not in user_prefs_cache:
-                user_prefs_cache[user_id] = {cam: False for cam in FRIGATE_CAMERAS}
-                
-            current_state = user_prefs_cache[user_id].get(camera_to_toggle, False)
-            new_state = not current_state
-            user_prefs_cache[user_id][camera_to_toggle] = new_state
-            
-            await query.edit_message_reply_markup(reply_markup=self.build_persistent_keyboard(user_id))
-            
-            payload = "1" if new_state else "0"
-            topic = f"{BOT_TOPIC}/bot/users/{user_id}/cameras/{camera_to_toggle}"
-            
-            #mqttc.publish(topic, payload=payload, qos=1, retain=True)
-            if mqttc and mqttc.is_connected():
-                mqttc.publish(topic, payload=payload, qos=1, retain=True)
-                logger.info(f"📤 Sent retain preference to MQTT topic: {topic} -> {payload}")
-            else:
-                logger.error("❌ Primary MQTT client is offline. Configuration state could not be sent.")
+    
 
 from telegram.ext import MessageHandler, filters
 

@@ -13,7 +13,11 @@ class Mode(Enum):
     NIGHT = ModeDetails("Night", "🌙 Night") # Ignore notifications that make sense, such as presence in bed room
     AT_HOME = ModeDetails("At Home", "🏠 At Home") # Ignore inside presence
     
-
+    def __invert__(self):
+        if self == Mode.AWAY:
+            return Mode.AT_HOME
+        else:
+            return Mode.AWAY
 
     @classmethod
     def from_name(cls, name_string):
