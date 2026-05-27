@@ -39,6 +39,65 @@ class DetectionEvent(Event):
     def __init__(self):
         super.__init__(self)
 
+class CameraActiveEvent(DetectionEvent):
+    def __init__(self, camera):
+        super.__init__(self)
+
+        self.camera = camera
+
+        self.update()
+
+    def update(self):
+        self.last_update = time.time()
+
+import datetime
+
+class CameraActiveEventHandler:
+    def __init__(self):
+        self.active_events = {}
+        self.decay_time = 10
+
+    def _get_active_time(self):
+        current_time = datetime.datetime.now().time()
+
+        night_time_start = datetime.time(0,0)
+        night_time_end = datetime,time(6,0)
+
+        if night_time_start <= current_time <= night_time_end:
+            return 2
+
+        return 10
+
+    def process(self, system, event_id, camera, msg):
+        if event_id not in self.active_events:
+            self.active_events[event_id] = CameraActiveEvent(camera)
+
+        self.active_events[event_id].update()
+
+        ## Events past their expiration
+
+        delete_keys = set()
+        for _event_id, _event in self.active_events:
+            if (_event.last_update - _event._create_time) > self._get_active_time(): #self.decay_time:
+                delete_keys.add(_event_id)
+        self.active_events = {k: self.active_events[k] for k in self.active_events.keys() - delete_keys} 
+
+        ## Build evidence for loitering
+
+        cameras_involved = {_event._camera for _event in self.active_events.values()}
+        
+        if len(cameras_involved) > 1:
+            CameraLoiteringEvent(cameras_involved).handle(system)
+
+class CameraLoiteringEvent(DetectionEvent):
+    def __init__(self, cameras_involved):
+        super.__init__(self)
+
+        self.cameras_involved = cameras_involved
+
+    def handle(self, system):
+        pass
+
 class CameraDetectionEvent(DetectionEvent):
     def __init__(self, camera_name, payload):
         super.__init__(self)

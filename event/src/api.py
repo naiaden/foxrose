@@ -44,24 +44,16 @@ def person_detected(msg):
     
     CameraDetectionEvent(camera_name, msg.payload).handle(system)
 
+def event_activity(msg):
+    event_id = "123"
+    CameraActiveEventHandler.process(system, event_id, camera, msg)
     
-
-DOORBELL_TOPIC = os.environ['DOORBELL_TOPIC']
 MQTT_SERVER = os.environ['mqtt_server']
 MQTT_SERVER_SECOND = os.environ['mqtt_server_second']
 LIGHTAPI_SERVER = os.environ['lightapi_server']
 
-BOT_TOKEN = os.environ['BOT_TOKEN']
-
 mqttc = None
 mqtts = None
-
-
-
-
-
-
-
 
 from systems.camera import CameraSystem
 from systems.notification import NotificationSystem
@@ -132,7 +124,6 @@ logging.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
 
 logger.info(f"{MQTT_SERVER=}")
 logger.info(f"{MQTT_SERVER_SECOND=}")
-logger.info(f"{DOORBELL_TOPIC=}")
 
 try:
     mqttc.connect(MQTT_SERVER, 1883, 60)
