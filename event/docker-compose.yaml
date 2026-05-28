@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - mqtt_server=1${mqtt_server}
+      - mqtt_server=${mqtt_server}
       - mqtt_server_second=${mqtt_server_second}
       - lightapi_server=${lightapi_server}
       - ACHTERDEUR_IP=${ACHTERDEUR_IP}
@@ -16,7 +16,7 @@ services:
       - DOORBELL_TOPIC=${DOORBELL_TOPIC}
       - VALID_DOORCARDS=${VALID_DOORCARDS}
       - BOT_TOKEN=${BOT_TOKEN}
-#      - KEY_MAP=${KEY_MAP}
+      - KEY_MAP=${KEY_MAP}
       - BOT_NAME=${BOT_NAME}
       - ALLOWED_USERS=${ALLOWED_USERS}
       - FRIGATE_CAMERAS=${FRIGATE_CAMERAS}

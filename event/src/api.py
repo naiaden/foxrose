@@ -65,7 +65,7 @@ class System:
     def __init__(self):
         self.allowed_users = [int(uid.strip()) for uid in os.environ['ALLOWED_USERS'].split(',')]
         self.valid_doorcards = os.environ['VALID_DOORCARDS'].split(',')
-        self.key_map = json.loads(os.environ.get('KEY_MAP', '{}'))
+        self.key_map = {k: v.split(',') for x in os.environ['KEY_MAP'].split(';') for k, v in [x.split(':')]}
 
         self.camera_system = CameraSystem()
 

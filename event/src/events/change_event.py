@@ -64,7 +64,9 @@ class UserModeToggleEvent(UserSettingsChangedEvent):
     def __init__(self, user_id, value=None):
         super().__init__(user_id, UserSettingsType.MODE)
 
-        self.value = value  or not system.notification_system.get_user_mode(user_id)
+        self.value = value
 
     def handle(self, system):
+        if value is None:
+            self.value = not system.notification_system.get_user_mode(user_id)
         system.notification_system.set_user_mode(self.user_id, self.value)
