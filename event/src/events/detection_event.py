@@ -29,12 +29,11 @@ class DetectionEvent(Event):
         logger.info(self)
 
 class CameraActiveEvent(DetectionEvent):
-    def __init__(self, camera):
+    def __init__(self, camera, event_id):
         super().__init__()
 
         self.camera = camera
-
-
+        self.event_id = event_id
 
         self.updates = []
         self.update()
@@ -43,7 +42,7 @@ class CameraActiveEvent(DetectionEvent):
 
     @color_wrap
     def __str__(self):
-        return f"[{self.create_time_str}] CameraActiveEvent: {self.camera} (last update: {self.last_update}/#{len(self.updates)})"
+        return f"[{self.create_time_str}] CameraActiveEvent [{self.event_id}]: {self.camera} (last update: {self.last_update}/#{len(self.updates)})"
 
     def update(self):
         
@@ -76,7 +75,9 @@ class DetectionConfidence(Enum):
 class CameraActiveEventHandler:
     def __init__(self):
         self.active_events = {}
-        self.decay_time = 10
+        self.decay_time = 10*60
+
+        self.triggering_events = set()
 
     def _get_active_time(self):
         current_time = datetime.datetime.now().time()
@@ -93,7 +94,7 @@ class CameraActiveEventHandler:
 
     def process(self, system, event_id, camera, msg_payload):
         if event_id not in self.active_events:
-            self.active_events[event_id] = CameraActiveEvent(camera)
+            self.active_events[event_id] = CameraActiveEvent(camera, event_id)
 
         logger.info(f"{len(self.active_events)} active events before pruning")
 
@@ -103,24 +104,33 @@ class CameraActiveEventHandler:
 
         delete_keys = set()
         for _event_id, _event in self.active_events.items():
-            if (duration := _event.last_update - _event._create_time) > self._get_active_time(): #self.decay_time:
-                logger.info(f"{_event_id} was removed because it was stale for {duration}")
+            if (duration := _event.last_update - _event._create_time) > self.decay_time:
+                logger.debug(f"{_event_id} was removed because it was stale for {duration}")
                 delete_keys.add(_event_id)
         self.active_events = {k: self.active_events[k] for k in self.active_events.keys() - delete_keys} 
 
-        logger.info(f"{len(self.active_events)} active events after pruning")
+        logger.debug(f"{len(self.active_events)} active events after pruning")
 
         ## Build evidence for loitering
 
         cameras_involved = {_event.camera for _event in self.active_events.values()}
 
-        logger.info(f"Currently activity on {len(cameras_involved)} cameras")
+        logger.warning(f"Currently activity on {len(cameras_involved)} cameras")
 
-        confidence = DetectionConfidence.from_duration##FROM ORDERED LIST
+        ## 
 
+        event = self.active_events[event_id]
+        event_duration = event.last_update - event._create_time
+        confidence = DetectionConfidence.from_duration(event_duration)
+        logging.info(f"Loitering confidence for {event_id} is {confidence} "
+                     f"because it's been active for {event_duration} seconds in {len(event.updates)} updates.")
 
-        if len(cameras_involved) > 1:
-            CameraLoiteringEvent(cameras_involved, confidence).handle(system)
+        if event_id not in self.triggering_events:
+            if confidence == DetectionConfidence.LOITERING or len(cameras_involved) > 1:
+                CameraLoiteringEvent(cameras_involved, confidence).handle(system)
+                self.triggering_events.add(event_id)
+
+            
 
 class CameraLoiteringEvent(DetectionEvent):
     def __init__(self, cameras_involved, confidence):
@@ -135,6 +145,8 @@ class CameraLoiteringEvent(DetectionEvent):
 
     def handle(self, system):
         logger.info(self)
+
+        # send snaps to telegram
 
 class CameraDetectionEvent(DetectionEvent):
     def __init__(self, camera_name, payload):
