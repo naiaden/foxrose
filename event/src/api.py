@@ -84,7 +84,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
     client.subscribe(f"{system.notification_system.mqtt_topic}/bot/users/+/cameras/+")
 
 def on_message(client, userdata, msg):
-    logger.info(msg.topic+" "+str(msg.payload))
+    logger.debug(msg.topic+" "+str(msg.payload))
 
     if msg.topic.startswith(f"{system.notification_system.mqtt_topic}/bot/users/"):
         from_bot(msg)
@@ -100,7 +100,7 @@ def on_connect_second(client, userdata, flags, reason_code, properties):
     client.subscribe("frigate/+/+/snapshot")
 
 def on_message_second(client, userdata, msg):
-    logger.info("Person detected: " + msg.topic)
+    logger.debug("Person detected: " + msg.topic)
 
     person_detected(msg)
 

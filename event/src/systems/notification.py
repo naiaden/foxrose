@@ -62,6 +62,5 @@ class NotificationSystem:
     def _publish_retained(self, topic, payload):
         if self.mqtt_publish_server and self.mqtt_publish_server.is_connected():
             self.mqtt_publish_server.publish(topic, payload=payload, qos=1, retain=True)
-            logger.info(f"📤 Sent retain preference to MQTT topic: {topic} -> {payload}")
         else:
             logger.error("❌ Primary MQTT client is offline. Configuration state could not be sent.")

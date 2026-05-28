@@ -5,7 +5,7 @@ import logging
 import requests
 from modes import Mode
 
-from events.change_event import UserModeToggleEvent
+from events.change_event import UserModeToggleEvent, UserSettingsChangedEvent, UserSettingsType
 
 import io
 
@@ -14,6 +14,9 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[logging.StreamHandler()]
 )
+
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("telegram").setLevel(logging.WARNING)
 
 BOT_TOKEN = os.environ['BOT_TOKEN']
 
@@ -30,7 +33,7 @@ def send_to_telegram(chat_id, image_bytes, camera_name):
     
     try:
         response = requests.post(url, files=files, data=data)
-        logging.info(f"Sent snapshot from {camera_name}: {response.status_code}")
+        logging.debug(f"Sent snapshot from {camera_name}: {response.status_code}")
     except Exception as e:
         logging.error(f"Error sending to Telegram: {e}")
 

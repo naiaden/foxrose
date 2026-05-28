@@ -1,5 +1,9 @@
-from events.event import Event
+from events.event import Event, color_wrap
 from enum import Enum, auto
+
+from systems.telegram import send_to_telegram
+
+from colorama import Fore
 import logging
 
 logging.basicConfig(
@@ -14,16 +18,31 @@ class DetectionEvent(Event):
     def __init__(self):
         super().__init__()
 
+    _SS = f"{Fore.YELLOW}"
+
+    @color_wrap
+    def __str__(self):
+        return f"[{self.create_time_str}] DetectionEvent"
+
+    def handle(self):
+        logger.info(self)
+
 class CameraActiveEvent(DetectionEvent):
     def __init__(self, camera):
         super().__init__()
 
         self.camera = camera
 
+        self.updates = []
         self.update()
+
+    @color_wrap
+    def __str__(self):
+        return f"[{self.create_time_str}] CameraActiveEvent: {self.camera} (last update: {self.last_update}/#{len(self.updates)})"
 
     def update(self):
         self.last_update = time.time()
+        self.updates.append(self.last_update)
 
 class DetectionConfidence(Enum):
     IGNORE = auto()
@@ -93,8 +112,12 @@ class CameraLoiteringEvent(DetectionEvent):
         self.cameras_involved = cameras_involved
         self.confidence = confidence
 
+    @color_wrap
+    def __str__(self):
+        return f"[{self.create_time_str}] CameraLoiteringEvent: {self.cameras_involved} -- confidence: {self.confidence}"
+
     def handle(self, system):
-        pass
+        logger.info(self)
 
 class CameraDetectionEvent(DetectionEvent):
     def __init__(self, camera_name, payload):
@@ -102,13 +125,19 @@ class CameraDetectionEvent(DetectionEvent):
         self.camera_name = camera_name
         self.payload = payload
 
+    @color_wrap
+    def __str__(self):
+        return f"[{self.create_time_str}] CameraDetectionEvent: {self.camera_name}"
+
     def handle(self, system):
+        logger.info(self)
+
         target_chat_ids = []
         
         for user_id, camera_settings in system.notification_system.user_prefs_cache.items():
-            logger.info(f"{user_id=}, {camera_settings=}, {system.allowed_users=}, {system.notification_system.is_user_snoozed(user_id)=}")
+            logger.debug(f"{user_id=}, {camera_settings=}, {system.allowed_users=}, {system.notification_system.is_user_snoozed(user_id)=}")
             if user_id in system.allowed_users and camera_settings[self.camera_name] and not system.notification_system.is_user_snoozed(user_id):
-                logger.info(f"{user_id=} added to {target_chat_ids=}")
+                logger.debug(f"{user_id=} added to {target_chat_ids=}")
                 target_chat_ids.append(user_id)
         
         for chat_id in target_chat_ids:
@@ -118,10 +147,31 @@ class PresenceDetectionEvent(DetectionEvent):
     def __init__(self):
         super().__init__()
 
+    @color_wrap
+    def __str__(self):
+        return f"[{self.create_time_str}] PresenceDetectionEvent"
+
+    def handle(self, system):
+        logger.info(self)
+
 class IndoorPresenceDetectionEvent(PresenceDetectionEvent):
     def __init__(self):
         super().__init__()
 
+    @color_wrap
+    def __str__(self):
+        return f"[{self.create_time_str}] IndoorPresenceDetectionEvent"
+
+    def handle(self, system):
+        logger.info(self)
+
 class OutdoorPresenceDetectionEvent(PresenceDetectionEvent):
     def __init__(self):
         super().__init__()
+
+    @color_wrap
+    def __str__(self):
+        return f"[{self.create_time_str}] OutdoorPresenceDetectionEvent"
+    
+    def handle(self, system):
+        logger.info(self)
