@@ -7,6 +7,9 @@ from systems.telegram import send_to_telegram, FoxRoseHandler
 from systems.dahua import get_snapshot
 from modes import Mode
 
+from events.change_event import UserSettingsChangedEvent, UserSettingsType
+from events.detection_event import CameraActiveEventHandler, CameraDetectionEvent
+from events.doorcard_event import DoorCardEvent
 import time
 
 logging.basicConfig(
@@ -50,7 +53,7 @@ def event_activity(msg):
     
 MQTT_SERVER = os.environ['mqtt_server']
 MQTT_SERVER_SECOND = os.environ['mqtt_server_second']
-LIGHTAPI_SERVER = os.environ['lightapi_server']
+
 
 mqttc = None
 mqtts = None

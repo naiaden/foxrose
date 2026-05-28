@@ -5,7 +5,7 @@ import logging
 import requests
 from modes import Mode
 
-from events import UserModeToggleEvent
+from events.change_event import UserModeToggleEvent
 
 import io
 
