@@ -1,6 +1,7 @@
 from events.event import Event, color_wrap
 from enum import Enum, auto
-
+import time
+import datetime
 from systems.telegram import send_to_telegram
 
 from colorama import Fore
@@ -33,16 +34,24 @@ class CameraActiveEvent(DetectionEvent):
 
         self.camera = camera
 
+
+
         self.updates = []
         self.update()
+
+    _SS = f"{Fore.RED}"
 
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] CameraActiveEvent: {self.camera} (last update: {self.last_update}/#{len(self.updates)})"
 
     def update(self):
+        
+
         self.last_update = time.time()
         self.updates.append(self.last_update)
+
+        logger.info(self)
 
 class DetectionConfidence(Enum):
     IGNORE = auto()
@@ -73,7 +82,7 @@ class CameraActiveEventHandler:
         current_time = datetime.datetime.now().time()
 
         night_time_start = datetime.time(0,0)
-        night_time_end = datetime,time(6,0)
+        night_time_end = datetime.time(6,0)
 
         if night_time_start <= current_time <= night_time_end:
             return 2
@@ -82,23 +91,31 @@ class CameraActiveEventHandler:
 
 
 
-    def process(self, system, event_id, camera, msg):
+    def process(self, system, event_id, camera, msg_payload):
         if event_id not in self.active_events:
             self.active_events[event_id] = CameraActiveEvent(camera)
+
+        logger.info(f"{len(self.active_events)} active events before pruning")
 
         self.active_events[event_id].update()
 
         ## Events past their expiration
 
         delete_keys = set()
-        for _event_id, _event in self.active_events:
-            if (_event.last_update - _event._create_time) > self._get_active_time(): #self.decay_time:
+        for _event_id, _event in self.active_events.items():
+            if (duration := _event.last_update - _event._create_time) > self._get_active_time(): #self.decay_time:
+                logger.info(f"{_event_id} was removed because it was stale for {duration}")
                 delete_keys.add(_event_id)
         self.active_events = {k: self.active_events[k] for k in self.active_events.keys() - delete_keys} 
 
+        logger.info(f"{len(self.active_events)} active events after pruning")
+
         ## Build evidence for loitering
 
-        cameras_involved = {_event._camera for _event in self.active_events.values()}
+        cameras_involved = {_event.camera for _event in self.active_events.values()}
+
+        logger.info(f"Currently activity on {len(cameras_involved)} cameras")
+
         confidence = DetectionConfidence.from_duration##FROM ORDERED LIST
 
 

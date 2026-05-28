@@ -47,9 +47,9 @@ def person_detected(msg):
     
     CameraDetectionEvent(camera_name, msg.payload).handle(system)
 
-def event_activity(msg):
-    event_id = "123"
-    CameraActiveEventHandler.process(system, event_id, camera, msg)
+def frigate_event(msg):
+    payload = json.loads(msg.payload.decode())
+    system.camera_active_event_handler.process(system, payload["after"]["id"], payload["after"]["camera"], payload)
     
 MQTT_SERVER = os.environ['mqtt_server']
 MQTT_SERVER_SECOND = os.environ['mqtt_server_second']
@@ -68,7 +68,7 @@ class System:
         self.key_map = {k: v.split(',') for x in os.environ['KEY_MAP'].split(';') for k, v in [x.split(':')]}
 
         self.camera_system = CameraSystem()
-
+        self.camera_active_event_handler = CameraActiveEventHandler()
         self.notification_system = NotificationSystem(self.allowed_users, self.camera_system.captured_cameras, mqttc)
 
 
@@ -98,11 +98,15 @@ def on_message(client, userdata, msg):
 def on_connect_second(client, userdata, flags, reason_code, properties):
     logger.info(f"Connected to second (frigate) with result code {reason_code}")
     client.subscribe("frigate/+/+/snapshot")
+    client.subscribe("frigate/events")
 
 def on_message_second(client, userdata, msg):
-    logger.debug("Person detected: " + msg.topic)
+    if msg.topic == "frigate/events":
+        frigate_event(msg)
+    else:
+        logger.debug("Person detected: " + msg.topic)
 
-    person_detected(msg)
+        person_detected(msg)
 
     
         
