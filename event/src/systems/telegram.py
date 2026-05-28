@@ -22,14 +22,14 @@ BOT_TOKEN = os.environ['BOT_TOKEN']
 
 logger = logging.getLogger(__name__)
 
-def send_to_telegram(chat_id, image_bytes, camera_name):
+def send_to_telegram(chat_id, image_bytes, camera_name, silent=False):
     logger.info(f"{chat_id=}, {camera_name=}")
 
     url =  f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
 
 
     files = {'photo': ('snapshot.jpg', io.BytesIO(image_bytes), 'image/jpeg')}
-    data = {'chat_id': chat_id, 'caption': f"Person detected on {camera_name}"}
+    data = {'chat_id': chat_id, 'caption': f"Person detected on {camera_name}", 'disable_notification': silent}
     
     try:
         response = requests.post(url, files=files, data=data)

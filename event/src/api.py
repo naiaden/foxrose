@@ -3,7 +3,7 @@ import json
 import requests
 import os
 import logging
-from systems.telegram import send_to_telegram, FoxRoseHandler
+from systems.telegram import FoxRoseHandler
 from systems.dahua import get_snapshot
 from modes import Mode
 

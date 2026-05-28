@@ -64,3 +64,6 @@ class NotificationSystem:
             self.mqtt_publish_server.publish(topic, payload=payload, qos=1, retain=True)
         else:
             logger.error("❌ Primary MQTT client is offline. Configuration state could not be sent.")
+    
+    def is_silent(self):
+        return False

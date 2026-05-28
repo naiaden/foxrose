@@ -141,7 +141,7 @@ class CameraDetectionEvent(DetectionEvent):
                 target_chat_ids.append(user_id)
         
         for chat_id in target_chat_ids:
-            send_to_telegram(chat_id, self.payload, self.camera_name)
+            send_to_telegram(chat_id, self.payload, self.camera_name, system.notification_system.is_silent())
 
 class PresenceDetectionEvent(DetectionEvent):
     def __init__(self):
