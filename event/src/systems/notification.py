@@ -67,3 +67,36 @@ class NotificationSystem:
     
     def is_silent(self):
         return False
+
+    # STANDARD = ModeDetails("All", "🌐 All")
+    # AWAY = ModeDetails("Away", "🧳 Away") # Trigger on all events, including presence detection
+    # NIGHT = ModeDetails("Night", "🌙 Night") # Ignore notifications that make sense, such as presence in bed room
+    # AT_HOME = ModeDetails("At Home", "🏠 At Home") # Ignore inside presence
+    
+
+    # notify silent priority(1-5)
+    def event_processing_arbiter(self, event, user_id):
+        if snooze := self.is_user_snoozed(user_id):
+            return snooze
+
+        if self.get_user_mode(user_id) == Mode.AT_HOME:
+            if isinstance(event, CameraDetectionEvent) and self.get_user_preference(user_id, event.camera_name):
+                return (True, False, "high")
+
+
+
+        elif self.get_user_mode(user_id) == Mode.AWAY:
+            if isinstance(event, CameraDetectionEvent) and self.get_user_preference(user_id, event.camera_name):
+                return (True, False, "high")
+
+
+
+        elif self.get_user_mode(user_id) == Mode.NIGHT:
+            if isinstance(event, CameraDetectionEvent) and self.get_user_preference(user_id, event.camera_name):
+                return (True, False, "high")
+
+
+
+        else: # self.get_user_mode(user_id) == Mode.STANDARD:
+            if isinstance(event, CameraDetectionEvent) and self.get_user_preference(user_id, event.camera_name):
+                return (True, False, "high")

@@ -36,4 +36,4 @@ class DoorCardEvent(Event):
         for user_id, keys in system.key_map.items():
             if self.card_number in keys:
 
-                UserModeToggleEvent(user_id )
+                UserModeToggleEvent(user_id ).handle(system)

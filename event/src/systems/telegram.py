@@ -23,7 +23,7 @@ BOT_TOKEN = os.environ['BOT_TOKEN']
 logger = logging.getLogger(__name__)
 
 def send_to_telegram(chat_id, image_bytes, camera_name, silent=False):
-    logger.info(f"{chat_id=}, {camera_name=}")
+    logger.debug(f"{chat_id=}, {camera_name=}")
 
     url =  f"https://api.telegram.org/bot{BOT_TOKEN}/sendPhoto"
 

@@ -10,6 +10,7 @@ from modes import Mode
 from events.change_event import UserSettingsChangedEvent, UserSettingsType
 from events.detection_event import CameraActiveEventHandler, CameraDetectionEvent
 from events.doorcard_event import DoorCardEvent
+from events.device_event import BatteryEvent, LowBatteryEvent
 import time
 
 logging.basicConfig(
@@ -38,6 +39,12 @@ def from_bot(msg):
 
     UserSettingsChangedEvent(user_id, UserSettingsType.CAMERA_PREFERENCE, camera, enabled).handle(system)
 
+def from_device(msg):
+    device = msg.topic.split('/')[1]
+    payload = json.loads(msg.payload.decode())
+
+    if percentage := payload.get('battery', None):
+        BatteryEvent(device, battery)
 
 from events import *
 
@@ -81,6 +88,7 @@ def on_connect(client, userdata, flags, reason_code, properties):
     logger.info(f"Connected to main with result code {reason_code}")
     client.subscribe("DahuaVTO/DoorCard/Event/#") 
     client.subscribe("DahuaVTO/Invite/Event/#") 
+    client.subscribe("zigbee2mqtt/+")
     client.subscribe(f"{system.notification_system.mqtt_topic}/bot/users/+/cameras/+")
 
 def on_message(client, userdata, msg):
@@ -88,6 +96,8 @@ def on_message(client, userdata, msg):
 
     if msg.topic.startswith(f"{system.notification_system.mqtt_topic}/bot/users/"):
         from_bot(msg)
+    elif msg.topic.startswith("zigbee2mqtt"):
+        from_device(msg)
 
     match msg.topic:
         case "DahuaVTO/DoorCard/Event":

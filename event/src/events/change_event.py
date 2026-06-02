@@ -108,6 +108,6 @@ class UserModeToggleEvent(UserSettingsChangedEvent):
     def handle(self, system):
         logger.info(self)
 
-        if value is None:
+        if self.value is None:
             self.value = not system.notification_system.get_user_mode(user_id)
         system.notification_system.set_user_mode(self.user_id, self.value)
