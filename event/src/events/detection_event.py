@@ -2,7 +2,8 @@ from events.event import Event, color_wrap
 from enum import Enum, auto
 import time
 import datetime
-from systems.telegram import send_to_telegram
+
+from dataclasses import dataclass, field
 
 from colorama import Fore
 import logging
@@ -15,9 +16,8 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+@dataclass(frozen=True)
 class DetectionEvent(Event):
-    def __init__(self):
-        super().__init__()
 
     _SS = f"{Fore.YELLOW}"
 
@@ -25,32 +25,29 @@ class DetectionEvent(Event):
     def __str__(self):
         return f"[{self.create_time_str}] DetectionEvent"
 
-    def handle(self):
-        logger.info(self)
 
-class CameraActiveEvent(DetectionEvent):
-    def __init__(self, camera, event_id):
-        super().__init__()
+# @dataclass(frozen=False)
+# class CameraActiveEvent(DetectionEvent):
+#     camera:str
+#     event_id :str
 
-        self.camera = camera
-        self.event_id = event_id
+#     updates: list
+#     # update()
 
-        self.updates = []
-        self.update()
+#     _SS = f"{Fore.RED}"
 
-    _SS = f"{Fore.RED}"
+#     @color_wrap
+#     def __str__(self):
+#         return f"[{self.create_time_str}] CameraActiveEvent [{self.event_id}]: {self.camera} (last update: {self.last_update}/#{len(self.updates)})"
 
-    @color_wrap
-    def __str__(self):
-        return f"[{self.create_time_str}] CameraActiveEvent [{self.event_id}]: {self.camera} (last update: {self.last_update}/#{len(self.updates)})"
-
-    def update(self):
+#     # def update(self):
         
 
-        self.last_update = time.time()
-        self.updates.append(self.last_update)
+#     #     self.last_update = time.time()
+#     #     self.updates.append(self.last_update)
 
-        logger.info(self)
+#     #     logger.info(self)
+
 
 class DetectionConfidence(Enum):
     IGNORE = auto()
@@ -132,75 +129,56 @@ class CameraActiveEventHandler:
 
             
 
+@dataclass(frozen=True)
 class CameraLoiteringEvent(DetectionEvent):
-    def __init__(self, cameras_involved, confidence):
-        super().__init__()
 
-        self.cameras_involved = cameras_involved
-        self.confidence = confidence
+
+    cameras_involved : list
+    confidence : float
 
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] CameraLoiteringEvent: {self.cameras_involved} -- confidence: {self.confidence}"
 
-    def handle(self, system):
-        logger.info(self)
-
-        # send snaps to telegram
-
+@dataclass(frozen=True)
 class CameraDetectionEvent(DetectionEvent):
-    def __init__(self, camera_name, payload):
-        super().__init__()
-        self.camera_name = camera_name
-        self.payload = payload
+    camera_name: str
+    payload: dict
 
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] CameraDetectionEvent: {self.camera_name}"
 
-    def handle(self, system):
-        logger.info(self)
+    # def handle(self, system):
+    #     logger.info(self)
 
-        target_chat_ids = []
+    #     target_chat_ids = []
         
-        for user_id, camera_settings in system.notification_system.user_prefs_cache.items():
-            logger.debug(f"{user_id=}, {camera_settings=}, {system.allowed_users=}, {system.notification_system.is_user_snoozed(user_id)=}")
-            if user_id in system.allowed_users and camera_settings[self.camera_name] and not system.notification_system.is_user_snoozed(user_id):
-                logger.debug(f"{user_id=} added to {target_chat_ids=}")
-                target_chat_ids.append(user_id)
+    #     for user_id, camera_settings in system.notification_system.user_prefs_cache.items():
+    #         logger.debug(f"{user_id=}, {camera_settings=}, {system.allowed_users=}, {system.notification_system.is_user_snoozed(user_id)=}")
+    #         if user_id in system.allowed_users and camera_settings[self.camera_name] and not system.notification_system.is_user_snoozed(user_id):
+    #             logger.debug(f"{user_id=} added to {target_chat_ids=}")
+    #             target_chat_ids.append(user_id)
         
-        for chat_id in target_chat_ids:
-            send_to_telegram(chat_id, self.payload, self.camera_name, system.notification_system.is_silent())
+    #     for chat_id in target_chat_ids:
+    #         send_to_telegram(chat_id, self.payload, self.camera_name, system.notification_system.is_silent())
 
+@dataclass(frozen=True)
 class PresenceDetectionEvent(DetectionEvent):
-    def __init__(self):
-        super().__init__()
-
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] PresenceDetectionEvent"
 
-    def handle(self, system):
-        logger.info(self)
-
+@dataclass(frozen=True)
 class IndoorPresenceDetectionEvent(PresenceDetectionEvent):
-    def __init__(self):
-        super().__init__()
-
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] IndoorPresenceDetectionEvent"
 
-    def handle(self, system):
-        logger.info(self)
 
+@dataclass(frozen=True)
 class OutdoorPresenceDetectionEvent(PresenceDetectionEvent):
-    def __init__(self):
-        super().__init__()
-
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] OutdoorPresenceDetectionEvent"
     
-    def handle(self, system):
-        logger.info(self)

@@ -2,6 +2,8 @@ from events.event import Event, color_wrap
 from enum import Enum, auto
 import time
 
+from dataclasses import dataclass, field
+
 from colorama import Fore
 import logging
 
@@ -13,25 +15,32 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+@dataclass(frozen=True)
 class DeviceEvent(Event):
-    def __init__(self):
-        super().__init__()
-
-    _SS = f"{Fore.GREEN}"
+    _SS: str = field(default=f"{Fore.GREEN}", init=False, repr=False)
 
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] DeviceEvent"
 
-    def handle(self):
-        logger.info(self)
-
-class LowBatteryEvent(Event):
+@dataclass(frozen=True)
+class BatteryEvent(DeviceEvent):
     def __init__(self, device, percentage):
         super().__init__()
 
-        self.device = device
-        self.percentage = percentage
+        device : str
+        percentage : int
+
+    # def handle(self, system):
+    #     if self.percentage < 10:
+    #         LowBatteryEvent(device, percentage).handle(system)
+
+    @color_wrap
+    def __str__(self):
+        return f"[{self.create_time_str}] BatteryEvent [{self.device}]: {self.percentage}%)"
+
+@dataclass(frozen=True)
+class LowBatteryEvent(BatteryEvent):
 
     @color_wrap
     def __str__(self):

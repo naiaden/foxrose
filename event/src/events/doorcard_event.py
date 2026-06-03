@@ -5,6 +5,8 @@ from events.change_event import UserModeToggleEvent
 
 LIGHTAPI_SERVER = os.environ['lightapi_server']
 
+from dataclasses import dataclass, field
+
 from colorama import Fore
 import logging
 logging.basicConfig(
@@ -16,11 +18,10 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-
+@dataclass(frozen=True)
 class DoorCardEvent(Event):
-    def __init__(self, card_number):
-        super().__init__()
-        self.card_number = card_number
+
+    card_number: str
 
     _SS = f"{Fore.MAGENTA}"
 
@@ -33,7 +34,7 @@ class DoorCardEvent(Event):
         #     print("LAMPJES")
         #     requests.post(f'http://{LIGHTAPI_SERVER}:8555/home/active/toggle')
 
-        for user_id, keys in system.key_map.items():
-            if self.card_number in keys:
+        # for user_id, keys in system.key_map.items():
+        #     if self.card_number in keys:
 
-                UserModeToggleEvent(user_id ).handle(system)
+        #         UserModeToggleEvent(user_id ).handle(system)

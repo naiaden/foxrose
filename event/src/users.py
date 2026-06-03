@@ -1,0 +1,118 @@
+from datetime import datetime
+from typing import Dict, List, Any, Set, Optional
+from modes import Mode
+from events.event import Event
+from events.detection_event import CameraDetectionEvent
+
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+
+logger = logging.getLogger(__name__)
+
+class User:
+    def __init__(self, name:str, telegram_user_id:int=None, keycards:List[str]=None):
+
+        self.name = name
+        self.telegram_user_id = telegram_user_id
+
+        self._camera_preferences:Dict[str, bool] = {}
+        
+        self._keycards:Set[str] = keycards or set()
+
+        self._snooze_time:datetime = None
+        self._mode = Mode.AT_HOME
+
+    def __str__(self) -> str:
+        return "[" + self.name + "]"
+
+    def wants_notification(self, event: Event) -> bool:
+        if self.is_snoozing:
+            return False
+
+        if isinstance(event, CameraDetectionEvent):
+            return self.has_camera_interest(event.camera_name)
+
+        return True
+                
+    @property
+    def mode(self) -> Mode:
+        return self._mode
+
+    @mode.setter
+    def mode(self, mode:Mode) -> None:
+        self._mode = mode
+
+    @property
+    def is_snoozing(self) -> bool:
+        if not self._snooze_time:
+            return False 
+
+        return datetime.now() < self._snooze_time
+
+    def snooze_until(self, new_time : datetime) -> None:
+        if not isinstance(new_time, datetime):
+            raise TypeError("snooze_time must be a datetime object")
+        self._snooze_time = new_time
+
+    def has_camera_interest(self, camera_name:str) -> bool:
+        return self._camera_preferences.get(camera_name, False)
+
+    @property
+    def camera_interests(self):
+        return self._camera_preferences
+
+    def uses_keycard(self, keycard_id:str) -> bool:
+        return keycard_id in self._keycards
+
+    def add_keycard(self, keycard_id:str) -> None:
+        self._keycards.add(keycard_id)
+
+    @property
+    def keycards(self) -> Set[str]:
+        return self._keycards
+
+class UserManager:
+    def __init__(self, users:List[User], allowed_user_names:List[str]):
+        self._users = {user.name:user for user in users}
+        self._allowed_users = {self.get_user(user_name) for user_name in allowed_user_names}
+
+        logger.info(f"{len(self._users)} users initialised")
+        logger.info(f"Users: {self._users.keys()}")
+
+    def is_allowed(self, user: User) -> bool:
+        return user in self._allowed_users
+
+    def get_user(self, user_name: str) -> Optional[User]:
+        return self._users.get(user_name)
+
+    def get_user_mode(self, user:User) -> Mode:
+        for _user in self._users.values():
+            if _user == user:
+                return _user.mode
+
+    def get_user_from_telegram_id(self, telegram_user_id: int) -> User:
+        for user in self._users.values():
+            if user.telegram_user_id and user.telegram_user_id == telegram_user_id:
+                return user
+
+    def get_all_users(self) -> List[User]:
+        return list(self._users.values())
+
+
+    @staticmethod
+    def from_env_string(users_as_env:str)->List[User]:
+        users = []
+        for user_attributes in users_as_env.split(';'):
+            user, *attributes = user_attributes.split(':')
+
+            telegram_id = int(next((attribute for attribute in attributes if attribute.startswith('T')), "").lstrip('T'))
+            keycards = next((attribute for attribute in attributes if attribute.startswith('K')), "").lstrip('K').split(',')
+
+            users.append(User(user, telegram_id, keycards))
+
+        return users

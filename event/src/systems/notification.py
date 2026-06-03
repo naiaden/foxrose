@@ -82,18 +82,30 @@ class NotificationSystem:
         if self.get_user_mode(user_id) == Mode.AT_HOME:
             if isinstance(event, CameraDetectionEvent) and self.get_user_preference(user_id, event.camera_name):
                 return (True, False, "high")
+            elif isinstance(event, IndoorPresenceDetectionEvent):
+                return (False, False, "ignore")
+            elif isinstance(event, OutdoorPresenceDetectionEvent):
+                return (False, True, "ignore")
 
 
 
         elif self.get_user_mode(user_id) == Mode.AWAY:
             if isinstance(event, CameraDetectionEvent) and self.get_user_preference(user_id, event.camera_name):
                 return (True, False, "high")
+            elif isinstance(event, IndoorPresenceDetectionEvent):
+                return (True, False, "critical")
+            elif isinstance(event, OutdoorPresenceDetectionEvent):
+                return (False, True, "ignore")
 
 
 
         elif self.get_user_mode(user_id) == Mode.NIGHT:
             if isinstance(event, CameraDetectionEvent) and self.get_user_preference(user_id, event.camera_name):
-                return (True, False, "high")
+                return (True, False, "critical")
+            elif isinstance(event, IndoorPresenceDetectionEvent):
+                return (True, True, "critical")
+            elif isinstance(event, OutdoorPresenceDetectionEvent):
+                return (False, True, "ignore")
 
 
 
