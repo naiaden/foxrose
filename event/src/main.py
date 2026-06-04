@@ -70,7 +70,7 @@ def main():
         address=mqtt_server_frigate
     ).connect()
 
-    bot = FoxRoseHandler(state_manager, telegram_token)
+    bot = FoxRoseHandler(state_manager, router, telegram_token)
     bot.run()
 
     # mqtt_main = setup_mqtt_client(MQTT_SERVER, dispatcher, on_connect_primary, on_message_handler)

@@ -37,16 +37,16 @@ class UserSettingsType(Enum):
     SNOOZE = auto()
 
 class UserSettingsChangedEvent(ChangeEvent):
-    def __init__(self, user_id, settings_type, settings_value=None, value=None):
+    def __init__(self, user, settings_type, settings_value=None, value=None):
         super().__init__()
-        self.user_id = user_id
+        self.user = user
         self.settings_type = settings_type
         self.settings_value = settings_value
         self.value = value
 
     @color_wrap
     def __str__(self):
-        return f"[{self.create_time_str}] UserSettingsChangedEvent: {self.user_id} {self.settings_type} {self.settings_value} {self.value}"
+        return f"[{self.create_time_str}] UserSettingsChangedEvent: {self.user} {self.settings_type} {self.settings_value} {self.value}"
 
     # def handle(self, system):
     #     logger.info(self)
@@ -54,13 +54,13 @@ class UserSettingsChangedEvent(ChangeEvent):
     #         system.notification_system.set_user_preference(self.user_id, self.settings_value, self.value)
 
 class UserSnoozeEvent(UserSettingsChangedEvent):
-    def __init__(self, user_id, snooze_time):
-        super().__init__(user_id, UserSettingsType.SNOOZE)
+    def __init__(self, user, snooze_time):
+        super().__init__(user, UserSettingsType.SNOOZE)
         self.value = snooze_time
 
     @color_wrap
     def __str__(self):
-        return f"[{self.create_time_str}] UserSnoozeEvent: {self.user_id} (snoozed for {self.value})"
+        return f"[{self.create_time_str}] UserSnoozeEvent: {self.user} (snoozed for {self.value})"
 
     # def handle(self, system):
     #     logger.info(self)
@@ -91,14 +91,14 @@ class UserSnoozeEvent(UserSettingsChangedEvent):
 
 
 class UserModeToggleEvent(UserSettingsChangedEvent):
-    def __init__(self, user_id, value=None):
-        super().__init__(user_id, UserSettingsType.MODE)
+    def __init__(self, user, value=None):
+        super().__init__(user, UserSettingsType.MODE)
 
         self.value = value
 
     @color_wrap
     def __str__(self):
-        return f"[{self.create_time_str}] UserModeToggleEvent: {self.user_id} -- Toggled: {self.value}"
+        return f"[{self.create_time_str}] UserModeToggleEvent: {self.user} -- Toggled: {self.value}"
 
     # def handle(self, system):
     #     logger.info(self)
