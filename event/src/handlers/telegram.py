@@ -37,7 +37,6 @@ class FoxRoseHandler:
         self.application.add_error_handler(error_handler)
 
     def run(self):
-        logger.info("hoi")
         self.application.run_polling(drop_pending_updates=True)
 
     def build_persistent_keyboard(self, user: User) -> ReplyKeyboardMarkup:

@@ -27,7 +27,7 @@ class StateManager:
         self._current_house_mode = Mode.AT_HOME
         self._cameras = ["achterdeur", "voordeur", "tuinhuis"]
 
-    def is_doorcard_valid(self, card_id):
+    def is_doorcard_valid(self, card_id:str):
         return card_id in self._valid_doorcards
 
     def user_is_allowed(self, user:User) -> bool:
@@ -41,3 +41,7 @@ class StateManager:
 
     def user_from_telegram_id(self, user_id) -> User:
         return self.users.get_user_from_telegram_id(user_id)
+    
+    def user_from_doorcard(self, card_id:str):
+        return self.users.get_user_from_doorcard(card_id)
+

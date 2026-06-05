@@ -92,7 +92,7 @@ class MQTTMainDispatcher(MQTTDispatcher):
         payload = json.loads(msg.payload.decode())
 
         if percentage := payload.get('battery', None):
-            self.router.route_event(BatteryEvent(device, battery))
+            self.router.route_event(BatteryEvent(device, percentage))
 
 
 class MQTTFrigateDispatcher(MQTTDispatcher):

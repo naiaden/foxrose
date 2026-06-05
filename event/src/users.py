@@ -103,6 +103,11 @@ class UserManager:
     def get_all_users(self) -> List[User]:
         return list(self._users.values())
 
+    def get_user_from_doorcard(self, card_id:str) -> Optional[User]:
+        for user in self._users.values():
+            if user.uses_keycard(card_id):
+                return user
+
 
     @staticmethod
     def from_env_string(users_as_env:str)->List[User]:

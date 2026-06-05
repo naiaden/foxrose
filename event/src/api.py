@@ -24,40 +24,11 @@ logger = logging.getLogger(__name__)
 logger.info("start foxrose event handler")
 
 
-def doorcard(msg):
-    
-    payload = json.loads(msg.payload.decode())
 
-    DoorCardEvent(payload['Data']['Number']).handle(system)
-
-
-def from_bot(msg):
-    parts = msg.topic.split("/")
-    user_id = int(parts[3])
-    camera = parts[5]
-    enabled = msg.payload.decode().strip() == "1"
-
-    UserSettingsChangedEvent(user_id, UserSettingsType.CAMERA_PREFERENCE, camera, enabled).handle(system)
-
-def from_device(msg):
-    device = msg.topic.split('/')[1]
-    payload = json.loads(msg.payload.decode())
-
-    if percentage := payload.get('battery', None):
-        BatteryEvent(device, battery)
 
 from events import *
 
-def person_detected(msg):
-    parts = msg.topic.split('/')
-    camera_name = parts[1]
-    
-    CameraDetectionEvent(camera_name, msg.payload).handle(system)
 
-def frigate_event(msg):
-    payload = json.loads(msg.payload.decode())
-    system.camera_active_event_handler.process(system, payload["after"]["id"], payload["after"]["camera"], payload)
-    
 MQTT_SERVER = os.environ['mqtt_server']
 MQTT_SERVER_SECOND = os.environ['mqtt_server_second']
 
@@ -84,39 +55,11 @@ system = System()
 # def doorbell(msg):
 #     requests.post(f'http://{settings["loxone_server"]}/dev/sps/io/mqtt_deurbel_gaat/1')
 
-def on_connect(client, userdata, flags, reason_code, properties):
-    logger.info(f"Connected to main with result code {reason_code}")
-    client.subscribe("DahuaVTO/DoorCard/Event/#") 
-    client.subscribe("DahuaVTO/Invite/Event/#") 
-    client.subscribe("zigbee2mqtt/+")
-    client.subscribe(f"{system.notification_system.mqtt_topic}/bot/users/+/cameras/+")
 
-def on_message(client, userdata, msg):
-    logger.debug(msg.topic+" "+str(msg.payload))
 
-    if msg.topic.startswith(f"{system.notification_system.mqtt_topic}/bot/users/"):
-        from_bot(msg)
-    elif msg.topic.startswith("zigbee2mqtt"):
-        from_device(msg)
 
-    match msg.topic:
-        case "DahuaVTO/DoorCard/Event":
-            doorcard(msg) 
-        case "DahuaVTO/Invite/Event":
-            doorbell(msg)
     
-def on_connect_second(client, userdata, flags, reason_code, properties):
-    logger.info(f"Connected to second (frigate) with result code {reason_code}")
-    client.subscribe("frigate/+/+/snapshot")
-    client.subscribe("frigate/events")
 
-def on_message_second(client, userdata, msg):
-    if msg.topic == "frigate/events":
-        frigate_event(msg)
-    else:
-        logger.debug("Person detected: " + msg.topic)
-
-        person_detected(msg)
 
     
         
