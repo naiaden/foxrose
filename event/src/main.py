@@ -19,7 +19,10 @@ load_dotenv(base_dir / ".env.dev")
 from sinks.telegram import TelegramSink
 from sinks.console import ConsoleSink
 
-from routing.router import NotificationRouter
+from events.doorcard_event import DoorCardEvent
+from events.change_event import UserModeToggleEvent, UserSnoozeEvent
+
+from routing.router import AfvalEventHandler, PresenceDetectionEventHandler, TemperatureEventHandler, UserSettingChangedEventHandler,NotificationRouter, DoorcardEventHandler, DeviceEventHandler, DetectionEventHandler, ModeToggleEventHandler, SnoozeEventHandler
 from handlers.mqtt import MQTTMainDispatcher, MQTTFrigateDispatcher
 from users import UserManager
 from state import StateManager
@@ -59,6 +62,19 @@ def main():
         sinks=notification_sinks
     )
 
+    handler_classes = (
+        AfvalEventHandler,
+        DoorcardEventHandler,
+        PresenceDetectionEventHandler,
+        DetectionEventHandler,
+        DeviceEventHandler,
+        SnoozeEventHandler,
+        ModeToggleEventHandler,
+        UserSettingChangedEventHandler,
+        TemperatureEventHandler,
+    )
+    handlers = [handler(router, state_manager) for handler in handler_classes]
+
     main_dispatcher = MQTTMainDispatcher(
         state_manager=state_manager,
         router=router,
@@ -72,6 +88,8 @@ def main():
 
     bot = FoxRoseHandler(state_manager, router, telegram_token)
     bot.run()
+
+    
 
     # mqtt_main = setup_mqtt_client(MQTT_SERVER, dispatcher, on_connect_primary, on_message_handler)
     # mqtts = setup_mqtt_client(MQTT_SERVER_SECOND, dispatcher, on_connect_secondary, on_message_handler)

@@ -1,5 +1,5 @@
 from typing import Dict, List, Any, Set
-
+from datetime import datetime
 import logging
 
 logging.basicConfig(
@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 from enum import Enum
 from users import UserManager, User
 from events.event import Event
+from temperatures import TemperatureTrend, TemperatureSystem
+
 
 from modes import Mode
 
@@ -26,6 +28,7 @@ class StateManager:
 
         self._current_house_mode = Mode.AT_HOME
         self._cameras = ["achterdeur", "voordeur", "tuinhuis"]
+        self._temperatures = TemperatureSystem(self)
 
     def is_doorcard_valid(self, card_id:str):
         return card_id in self._valid_doorcards
@@ -45,3 +48,5 @@ class StateManager:
     def user_from_doorcard(self, card_id:str):
         return self.users.get_user_from_doorcard(card_id)
 
+    def add_temperature_reading(self, device:str, temp:float, timestamp:datetime) -> TemperatureTrend:
+        return self._temperatures.add_reading(device, temp, timestamp)

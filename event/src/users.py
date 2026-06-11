@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Any, Set, Optional
 from modes import Mode
 from events.event import Event
@@ -54,13 +54,22 @@ class User:
 
         return datetime.now() < self._snooze_time
 
+    def reset_snooze(self) -> None:
+        self._snooze_time = None
+
     def snooze_until(self, new_time : datetime) -> None:
         if not isinstance(new_time, datetime):
             raise TypeError("snooze_time must be a datetime object")
         self._snooze_time = new_time
 
+    def snooze_for(self, duration) -> None:
+        self.snooze_until(datetime.now() + timedelta(seconds=duration))
+
     def has_camera_interest(self, camera_name:str) -> bool:
         return self._camera_preferences.get(camera_name, False)
+
+    def set_camera_interest(self, camera_name:str, value:bool=True) -> bool:
+        return self._camera_preferences.setdefault(camera_name, value)
 
     @property
     def camera_interests(self):

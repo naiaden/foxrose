@@ -131,8 +131,6 @@ class CameraActiveEventHandler:
 
 @dataclass(frozen=True)
 class CameraLoiteringEvent(DetectionEvent):
-
-
     cameras_involved : list
     confidence : float
 
@@ -149,22 +147,10 @@ class CameraDetectionEvent(DetectionEvent):
     def __str__(self):
         return f"[{self.create_time_str}] CameraDetectionEvent: {self.camera_name}"
 
-    # def handle(self, system):
-    #     logger.info(self)
-
-    #     target_chat_ids = []
-        
-    #     for user_id, camera_settings in system.notification_system.user_prefs_cache.items():
-    #         logger.debug(f"{user_id=}, {camera_settings=}, {system.allowed_users=}, {system.notification_system.is_user_snoozed(user_id)=}")
-    #         if user_id in system.allowed_users and camera_settings[self.camera_name] and not system.notification_system.is_user_snoozed(user_id):
-    #             logger.debug(f"{user_id=} added to {target_chat_ids=}")
-    #             target_chat_ids.append(user_id)
-        
-    #     for chat_id in target_chat_ids:
-    #         send_to_telegram(chat_id, self.payload, self.camera_name, system.notification_system.is_silent())
-
 @dataclass(frozen=True)
 class PresenceDetectionEvent(DetectionEvent):
+    device:str
+    
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] PresenceDetectionEvent"

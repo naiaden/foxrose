@@ -4,10 +4,11 @@ import logging
 from abc import abstractmethod
 from typing import Self
 import json
+from events.afval_event import AfvalEvent
 from events.change_event import UserSettingsChangedEvent, UserSettingsType
-from events.detection_event import CameraActiveEventHandler, CameraDetectionEvent
+from events.detection_event import CameraActiveEventHandler, CameraDetectionEvent, PresenceDetectionEvent
 from events.doorcard_event import DoorCardEvent
-from events.device_event import BatteryEvent, LowBatteryEvent
+from events.device_event import BatteryEvent, LowBatteryEvent, TemperatureEvent
 
 logging.basicConfig(
     level=logging.INFO,
@@ -58,6 +59,7 @@ class MQTTMainDispatcher(MQTTDispatcher):
         client.subscribe("DahuaVTO/Invite/Event/#") 
         client.subscribe("zigbee2mqtt/+")
         client.subscribe(f"foxrosehip/bot/users/+/cameras/+")
+        client.subscribe("foxrosehip/afval")
 
     def on_message_handler(self, client, userdata, msg):
         logger.debug(msg.topic+" "+str(msg.payload))
@@ -72,6 +74,11 @@ class MQTTMainDispatcher(MQTTDispatcher):
                 self._handle_doorcard(msg)
             case "DahuaVTO/Invite/Event":
                 pass
+            case "foxrosehip/afval":
+                self._handle_afval(msg)
+
+    def _handle_afval(self, msg):
+        self.router.route_event(AfvalEvent(msg.payload))
 
     def _handle_doorcard(self, msg):
         payload = json.loads(msg.payload.decode())
@@ -93,6 +100,12 @@ class MQTTMainDispatcher(MQTTDispatcher):
 
         if percentage := payload.get('battery', None):
             self.router.route_event(BatteryEvent(device, percentage))
+
+        if temperature := payload.get('temperature', None):
+            self.router.route_event(TemperatureEvent(device, temperature))
+
+        if presence := payload.get("presence", None):
+            self.router.route_event(PresenceDetectionEvent(device))
 
 
 class MQTTFrigateDispatcher(MQTTDispatcher):

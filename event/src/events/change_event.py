@@ -1,6 +1,8 @@
 from events.event import Event, color_wrap
 from enum import Enum, auto
-
+from typing import Optional, Any
+from dataclasses import dataclass
+from users import User
 from colorama import Fore
 import logging
 logging.basicConfig(
@@ -11,21 +13,16 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-
+@dataclass(frozen=True)
 class ChangeEvent(Event):
-    def __init__(self):
-        super().__init__()
-
     _SS = f"{Fore.CYAN}"
 
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] ChangeEvent"
 
+@dataclass(frozen=True)
 class SettingsChangedEvent(ChangeEvent):
-    def __init__(self):
-        super().__init__()
-
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] SettingsChangedEvent"
@@ -36,73 +33,31 @@ class UserSettingsType(Enum):
     MODE = auto()
     SNOOZE = auto()
 
+@dataclass(frozen=True)
 class UserSettingsChangedEvent(ChangeEvent):
-    def __init__(self, user, settings_type, settings_value=None, value=None):
-        super().__init__()
-        self.user = user
-        self.settings_type = settings_type
-        self.settings_value = settings_value
-        self.value = value
+    user: User
+    settings_type: UserSettingsType
+    settings_value: Optional[Any] = None
+    value: Optional[Any] = None
 
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] UserSettingsChangedEvent: {self.user} {self.settings_type} {self.settings_value} {self.value}"
 
-    # def handle(self, system):
-    #     logger.info(self)
-    #     if self.settings_type == UserSettingsType.CAMERA_PREFERENCE:
-    #         system.notification_system.set_user_preference(self.user_id, self.settings_value, self.value)
 
 class UserSnoozeEvent(UserSettingsChangedEvent):
-    def __init__(self, user, snooze_time):
-        super().__init__(user, UserSettingsType.SNOOZE)
-        self.value = snooze_time
+    settings_type: UserSettingsType = UserSettingsType.SNOOZE
+    value: int|float
 
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] UserSnoozeEvent: {self.user} (snoozed for {self.value})"
 
-    # def handle(self, system):
-    #     logger.info(self)
-
-    #     if self.value == None:
-    #         self.system.notification_system.reset_user_snooze(self.user_id)
-    #         return
-        
-    #     if isinstance(self.value, str):
-    #         amount, unit = self.value.split(' ')
-    #         duration = amount
-            
-    #         unit = unit.rstrip('s')
-
-    #         if unit.endswith('Min'):
-    #             duration *= 60
-    #         elif unit.endswith("Hour"):
-    #             duration *= 60 * 60
-    #         elif unit.endswith("Day"):
-    #             duration *= 24 * 60 * 60
-
-    #         self.system.notification_system.set_user_snooze(user_id, duration)
-    #         return
-
-    #     if isinstance(self.value, (int, float)):
-    #         self.system.notification_system.set_user_snooze(user_id, self.value)
-    #         return
 
 
 class UserModeToggleEvent(UserSettingsChangedEvent):
-    def __init__(self, user, value=None):
-        super().__init__(user, UserSettingsType.MODE)
-
-        self.value = value
+    settings_type: UserSettingsType = UserSettingsType.MODE
 
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] UserModeToggleEvent: {self.user} -- Toggled: {self.value}"
-
-    # def handle(self, system):
-    #     logger.info(self)
-
-    #     if self.value is None:
-    #         self.value = not system.notification_system.get_user_mode(user_id)
-    #     system.notification_system.set_user_mode(self.user_id, self.value)
