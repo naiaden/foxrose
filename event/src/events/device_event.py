@@ -50,7 +50,7 @@ class TemperatureEvent(DeviceEvent):
 
 @dataclass(frozen=True)
 class TemperatureRisingEvent(DeviceEvent):
-    history : list[float]
+    # history : list[float]
 
     @color_wrap
     def __str__(self):

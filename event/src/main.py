@@ -22,11 +22,12 @@ from sinks.console import ConsoleSink
 from events.doorcard_event import DoorCardEvent
 from events.change_event import UserModeToggleEvent, UserSnoozeEvent
 
-from routing.router import AfvalEventHandler, PresenceDetectionEventHandler, TemperatureEventHandler, UserSettingChangedEventHandler,NotificationRouter, DoorcardEventHandler, DeviceEventHandler, DetectionEventHandler, ModeToggleEventHandler, SnoozeEventHandler
+from routing.router import CameraDetectionEventHandler, AfvalEventHandler, PresenceDetectionEventHandler, TemperatureEventHandler, UserSettingChangedEventHandler,NotificationRouter, DoorcardEventHandler, DeviceEventHandler, ModeToggleEventHandler, SnoozeEventHandler
 from handlers.mqtt import MQTTMainDispatcher, MQTTFrigateDispatcher
 from users import UserManager
 from state import StateManager
 from handlers.telegram import FoxRoseHandler
+from sensors import Sensor
 
 def main():
     logger.info("Initialising FOXROSE")
@@ -35,6 +36,9 @@ def main():
         users = os.environ['USERS']
         allowed_users = os.environ['ALLOWED_USERS'].split(',')
         valid_doorcards = os.environ['VALID_DOORCARDS'].split(',')
+        sensors = [ (s.split(":")[0], s.split(":")[1], s.split(":")[2]) for s in os.environ['SENSORS'].split(";")]
+        cameras = os.environ['FRIGATE_CAMERAS'].split(',')
+        thermometers = {pair.split(":")[0]: pair.split(":")[1] for pair in os.environ['THERMOMETER'].split(";")}
 
         telegram_token = os.environ['BOT_TOKEN']
 
@@ -49,11 +53,14 @@ def main():
     state_manager = StateManager(
         users=UserManager.from_env_string(users),
         allowed_users=allowed_users,
-        valid_doorcards=valid_doorcards
+        valid_doorcards=valid_doorcards,
+        sensors=sensors,
+        cameras=cameras,
+        thermometers=thermometers,
     )
 
     notification_sinks = [
-        # TelegramSink(bot_token=telegram_token)
+        TelegramSink(bot_token=os.environ['BOT_TOKEN']),
         ConsoleSink()
     ]
 
@@ -66,7 +73,7 @@ def main():
         AfvalEventHandler,
         DoorcardEventHandler,
         PresenceDetectionEventHandler,
-        DetectionEventHandler,
+        CameraDetectionEventHandler,
         DeviceEventHandler,
         SnoozeEventHandler,
         ModeToggleEventHandler,
@@ -88,15 +95,6 @@ def main():
 
     bot = FoxRoseHandler(state_manager, router, telegram_token)
     bot.run()
-
-    
-
-    # mqtt_main = setup_mqtt_client(MQTT_SERVER, dispatcher, on_connect_primary, on_message_handler)
-    # mqtts = setup_mqtt_client(MQTT_SERVER_SECOND, dispatcher, on_connect_secondary, on_message_handler)
-    
-    # router.mqtt_publish_server = mqttc
-
-    #
 
     logger.info("Initialization complete. Starting application block...")
 

@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Set, Optional
 from modes import Mode
 from events.event import Event
-from events.detection_event import CameraDetectionEvent
+from events.detection_event import CameraDetectionEvent, PresenceDetectionEvent
 
 import logging
 
@@ -34,6 +34,9 @@ class User:
         if self.is_snoozing:
             return False
 
+        if isinstance(event, PresenceDetectionEvent):
+            return self.mode != Mode.AT_HOME
+
         if isinstance(event, CameraDetectionEvent):
             return self.has_camera_interest(event.camera_name)
 
@@ -62,14 +65,15 @@ class User:
             raise TypeError("snooze_time must be a datetime object")
         self._snooze_time = new_time
 
-    def snooze_for(self, duration) -> None:
+    def snooze_for(self, duration: timedelta) -> None:
         self.snooze_until(datetime.now() + timedelta(seconds=duration))
 
     def has_camera_interest(self, camera_name:str) -> bool:
         return self._camera_preferences.get(camera_name, False)
 
     def set_camera_interest(self, camera_name:str, value:bool=True) -> bool:
-        return self._camera_preferences.setdefault(camera_name, value)
+        self._camera_preferences[camera_name] = value
+        return value
 
     @property
     def camera_interests(self):
@@ -99,12 +103,18 @@ class UserManager:
     def get_user(self, user_name: str) -> Optional[User]:
         return self._users.get(user_name)
 
+    def set_user_mode(self, user:User, mode:Mode):
+        for _user in self._users.values():
+            if _user == user:
+                user.mode = mode
+
     def get_user_mode(self, user:User) -> Mode:
         for _user in self._users.values():
             if _user == user:
                 return _user.mode
 
     def get_user_from_telegram_id(self, telegram_user_id: int) -> User:
+        
         for user in self._users.values():
             if user.telegram_user_id and user.telegram_user_id == telegram_user_id:
                 return user

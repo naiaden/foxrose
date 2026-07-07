@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from colorama import Fore
 import logging
 
+from sensors import Sensor, SensorType
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -153,18 +155,22 @@ class PresenceDetectionEvent(DetectionEvent):
     
     @color_wrap
     def __str__(self):
-        return f"[{self.create_time_str}] PresenceDetectionEvent"
+        return f"[{self.create_time_str}] PresenceDetectionEvent on {self.device}"
 
 @dataclass(frozen=True)
 class IndoorPresenceDetectionEvent(PresenceDetectionEvent):
+    device: Sensor
+
     @color_wrap
     def __str__(self):
-        return f"[{self.create_time_str}] IndoorPresenceDetectionEvent"
+        return f"[{self.create_time_str}] IndoorPresenceDetectionEvent on {self.device}"
 
 
 @dataclass(frozen=True)
 class OutdoorPresenceDetectionEvent(PresenceDetectionEvent):
+    device: Sensor
+
     @color_wrap
     def __str__(self):
-        return f"[{self.create_time_str}] OutdoorPresenceDetectionEvent"
+        return f"[{self.create_time_str}] OutdoorPresenceDetectionEvent on {self.device}"
     

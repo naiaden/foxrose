@@ -44,7 +44,7 @@ class UserSettingsChangedEvent(ChangeEvent):
     def __str__(self):
         return f"[{self.create_time_str}] UserSettingsChangedEvent: {self.user} {self.settings_type} {self.settings_value} {self.value}"
 
-
+@dataclass(frozen=True)
 class UserSnoozeEvent(UserSettingsChangedEvent):
     settings_type: UserSettingsType = UserSettingsType.SNOOZE
     value: int|float
@@ -54,7 +54,7 @@ class UserSnoozeEvent(UserSettingsChangedEvent):
         return f"[{self.create_time_str}] UserSnoozeEvent: {self.user} (snoozed for {self.value})"
 
 
-
+@dataclass(frozen=True)
 class UserModeToggleEvent(UserSettingsChangedEvent):
     settings_type: UserSettingsType = UserSettingsType.MODE
 

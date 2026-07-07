@@ -21,4 +21,4 @@ class AfvalEvent(Event):
 
     @color_wrap
     def __str__(self):
-        return f"[{self.create_time_str}] AfvalEvent"
+        return f"[{self.create_time_str}] AfvalEvent: [{self.message}]"

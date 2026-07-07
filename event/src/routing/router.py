@@ -1,11 +1,12 @@
 from events.event import Event
 from events.afval_event import AfvalEvent
-from events.change_event import UserSettingsType, UserModeToggleEvent, UserSnoozeEvent, UserSettingsChangedEvent
+from events.change_event import UserSettingsType, UserModeToggleEvent, UserSnoozeEvent, UserSettingsChangedEvent, UserSettingsType
 from routing.rules import ROUTING_RULES, routing_rule, DeliveryType
 from events.doorcard_event import DoorCardEvent
-from events.detection_event import DetectionEvent, OutdoorPresenceDetectionEvent, IndoorPresenceDetectionEvent, PresenceDetectionEvent
+from events.detection_event import CameraDetectionEvent, DetectionEvent, OutdoorPresenceDetectionEvent, IndoorPresenceDetectionEvent, PresenceDetectionEvent
 from events.device_event import DeviceEvent, BatteryEvent, LowBatteryEvent, TemperatureEvent
 import logging
+from sensors import Sensor, SensorType
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
@@ -24,8 +25,9 @@ class AfvalEventHandler:
         self.router.subscribe(AfvalEvent, self.handle_afval_event)
 
     def handle_afval_event(self, event: AfvalEvent):
-        for sink in self.router.sinks:
-            sink.send(None, event.message, None, True)
+        for user in self.state.users.get_all_users():
+            for sink in self.router.sinks:
+                sink.send(user, event.message, None, True, pin=True)
 
 class UserSettingChangedEventHandler:
     def __init__(self, router, state_manager):
@@ -35,6 +37,7 @@ class UserSettingChangedEventHandler:
         self.router.subscribe(UserSettingsChangedEvent, self.handle_change_event)
 
     def handle_change_event(self, event: UserSettingsChangedEvent):
+        logger.debug(f"{event.user=} {event.settings_type=} {event.settings_value=} {event.value=}")
         if event.settings_type == UserSettingsType.CAMERA_PREFERENCE:
             event.user.set_camera_interest(event.settings_value, event.value)
 
@@ -55,7 +58,7 @@ class SnoozeEventHandler:
 
         if isinstance(event.value, str):
             amount, unit = event.value.split(' ')
-            duration = amount
+            duration = float(amount)
             
             unit = unit.rstrip('s')
 
@@ -85,7 +88,7 @@ class ModeToggleEventHandler:
         if value is None:
             value = not self.state.get_user_mode(event.user)
 
-        event.user.mode = value
+        self.state.set_user_mode(event.user, value)
 
 class DoorcardEventHandler:
     def __init__(self, router, state_manager):
@@ -96,32 +99,32 @@ class DoorcardEventHandler:
 
     def handle_doorcard(self, event: DoorCardEvent):
         user = self.state.user_from_doorcard(event.card_number)
-        self.route_event(UserModeToggleEvent(user))
+        self.router.route_event(UserModeToggleEvent(user, settings_type=UserSettingsType.MODE))
 
-class DetectionEventHandler:
+class CameraDetectionEventHandler:
     def __init__(self, router, state_manager):
         self.router = router
         self.state = state_manager
 
-        self.router.subscribe(DetectionEvent, self.handle_detection_event)
+        self.router.subscribe(CameraDetectionEvent, self.handle_detection_event)
 
-    def handle_detection_event(self, event: DetectionEvent):
-        for user in self.state.users.get_all_users():
+    def handle_detection_event(self, event: CameraDetectionEvent):
+        for user in [self.state.users.get_all_users()[0]]:
 
             user_mode = self.state.get_user_mode(user)
             priority = routing_rule(user_mode, event)
 
             if priority == DeliveryType.IGNORE:
-                return
+                continue
 
             is_silent = (priority == DeliveryType.SILENT)
 
             if self.state.user_wants_event(user, event):
-                for sink in self.sinks:
+                for sink in self.router.sinks:
                     sink.send(
                         user=user,
-                        message=f"Movement on {getattr(event, 'camera_name', 'sensor')}",
-                        payload=getattr(event, 'payload', {}),
+                        message=f"Movement on {event.camera_name}",
+                        payload=event.payload,
                         silent=is_silent
                     )
 
@@ -145,7 +148,7 @@ class TemperatureEventHandler:
         self.router.subscribe(TemperatureEvent, self.handle_temperature_event)
 
     def handle_temperature_event(self, event:TemperatureEvent):
-        if isinstance(event, TemperatureEvent):
+        if type(event) == TemperatureEvent:
             self.state.add_temperature_reading(event.device, event.temperature, event._create_time)
 
 class PresenceDetectionEventHandler:
@@ -156,20 +159,27 @@ class PresenceDetectionEventHandler:
         self.router.subscribe(PresenceDetectionEvent, self.handle_presence_event)
 
     def handle_presence_event(self, event:PresenceDetectionEvent):
-        if isinstance(event, PresenceDetectionEvent):
-            # if True: # indoor PIR
-            #     self.router.route_event(IndoorPresenceDetectionEvent(event.device))
-            # else:
-            #     self.router.route_event(OutdoorPresenceDetectionEvent(event.device))
 
+        if type(event) is PresenceDetectionEvent:
+            sensor = self.state.get_sensor(event.device)
+            self.state.presence_detected(sensor, event._create_time)
+
+            if sensor:
+                if sensor.sensor_type == SensorType.INDOOR:
+                    self.router.route_event(IndoorPresenceDetectionEvent(device=sensor))
+
+                if sensor.sensor_type == SensorType.OUTDOOR:
+                    self.router.route_event(OutdoorPresenceDetectionEvent(device=sensor))
+            else:
+                logger.info(f"Handled Presence Event for unknown/unregistered sensor {event.device}")
             return
 
-        if isinstance(event, IndoorPresenceDetectionEvent):
-            return
 
-        if isinstance(event, OutdoorPresenceDetectionEvent):
-            return
-
+        user = self.state.users.get_all_users()[0]
+        if (rule := routing_rule(self.state.get_user_mode(user), event)) != DeliveryType.IGNORE:
+            if user.wants_notification(event):
+                for sink in self.router.sinks:
+                    sink.send(user, f"Presence detected on {event.device!s}", None, rule == DeliveryType.SILENT)
 
 
 
@@ -185,7 +195,10 @@ class NotificationRouter:
         self._subscribers[event_type].append(callback)
 
     def route_event(self, event: Event):
-        logger.info(f"Routing {event!s}")
+        if isinstance(event, (BatteryEvent,TemperatureEvent)):
+            logger.debug(f"Routing {event!s}")
+        else:
+            logger.info(f"Routing {event!s}")
 
         for cls in event.__class__.__mro__:
             if cls in self._subscribers:

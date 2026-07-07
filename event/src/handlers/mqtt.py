@@ -87,7 +87,7 @@ class MQTTMainDispatcher(MQTTDispatcher):
 
     def _handle_from_bot(self, msg):
         parts = msg.topic.split("/")
-        user = self.state.user_from_telegram_id(parts[3])
+        user = self.state.user_from_telegram_id(int(parts[3]))
         camera = parts[5]
         enabled = msg.payload.decode().strip() == "1"
 

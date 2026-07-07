@@ -1,10 +1,12 @@
 
 from telegram import Update, ReplyKeyboardMarkup
+from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
 import logging
 import requests
 from modes import Mode
+import time
 
 from events.change_event import UserModeToggleEvent, UserSnoozeEvent, UserSettingsChangedEvent, UserSettingsType
 from events.detection_event import CameraActiveEventHandler, CameraDetectionEvent
@@ -23,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("telegram").setLevel(logging.WARNING)
-
+import humanize
+import datetime
 from sinks.base import NotificationSink
 
 class FoxRoseHandler:
@@ -33,6 +36,7 @@ class FoxRoseHandler:
 
         self.application = Application.builder().token(bot_token).build()
         self.application.add_handler(CommandHandler("start", self.start))
+        self.application.add_handler(CommandHandler("state", self.state))
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_keyboard_clicks))
         self.application.add_error_handler(error_handler)
 
@@ -53,9 +57,9 @@ class FoxRoseHandler:
             notification_row.append(f"{status_emoji} Notif: {cam_label}")
         keyboard.append(notification_row)
 
-        # 3. Rows for Snapshots
-        snapshot_row = [f"📸 Snap: {cam.title()}" for cam in self.system._cameras]
-        keyboard.append(snapshot_row)
+        # # 3. Rows for Snapshots
+        # snapshot_row = [f"📸 Snap: {cam.title()}" for cam in self.system._cameras]
+        # keyboard.append(snapshot_row)
 
         # 4. Row for Snooze
         snooze_label = "⏰ Unsnooze" if user.is_snoozing else "💤 Snooze Notifications"
@@ -98,6 +102,38 @@ class FoxRoseHandler:
             reply_markup=self.build_persistent_keyboard(user)
         )
 
+    async def state(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        logger.debug(f"State command received from effective user {update.effective_user.id}")
+        user = self.system.user_from_telegram_id(update.effective_user.id)
+        logger.info(f"State command received: {user!s} ({update.effective_user.id})")
+
+        if not self.system.user_is_allowed(user):
+            await update.message.reply_text("❌ Unauthorized access.")
+            return
+        
+        camera_text = "\n".join([f"- {key}: {value}" for key,value in user._camera_preferences.items()])
+        x = [f"{device} - {reading.as_emoji()}{temp} - ({round(temp-avg,2) if avg else '--'})" for device,(_,temp),reading,avg in self.system._temperatures.get_latest_readings()]
+        temp_text = "\n".join(x)
+        y = [f"{device_id} {humanize.naturaltime(datetime.timedelta(seconds=time.time() - timestamp))}" for device_id,timestamp in self.system._sensors.last_updates.items()]
+        temp_text1 = "\n".join(y)
+        
+        text = (
+            f"🤖 *System Status for `{user!s}`*\n"
+            f"🏡 Mode: `{user.mode}`\n\n"
+            f"📸 *Camera Preferences:*\n"
+            f"`{camera_text}\n\n`"
+            f"🌡️ *Temperatures:*\n" 
+            f"`{temp_text}`\n\n"
+            f"🌡️ *Presence:*\n"
+            f"`{temp_text1}`"
+        )
+        # logger.info(text)
+        await update.message.reply_text(
+            text,
+            parse_mode=ParseMode.MARKDOWN_V2
+)
+
+
     async def handle_keyboard_clicks(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = self.system.user_from_telegram_id(update.effective_user.id)
         text = update.message.text
@@ -110,7 +146,7 @@ class FoxRoseHandler:
         if text in (mode.label for mode in Mode):
             mode = Mode.from_label(text)
             logger.info(f"User {user!s} set mode to {mode.display_name}")
-            self.router.route_event(UserModeToggleEvent(user, mode))
+            self.router.route_event(UserModeToggleEvent(user=user, value=mode))
             await update.message.reply_text(f"✅ Mode changed to: {mode.display_name}")
             return
 
@@ -122,11 +158,12 @@ class FoxRoseHandler:
             
             # Pull preferences and invert the boolean
             new_state = not user.has_camera_interest(camera_to_toggle)
-            self.router.route_event(UserSettingsChangedEvent(user, UserSettingsType.CAMERA_PREFERENCE, camera_to_toggle, new_state))
+            logger.info(user.has_camera_interest(camera_to_toggle))
+            self.router.route_event(UserSettingsChangedEvent(user=user, settings_type=UserSettingsType.CAMERA_PREFERENCE, settings_value=camera_to_toggle, value=new_state))
 
             # Update the user interface keyboard immediately with the new emoji
             await update.message.reply_text(
-                f"Updated notification settings for {cam_title}.",
+                f"Updated notification settings for {cam_title} to {new_state}.",
                 reply_markup=self.build_persistent_keyboard(user)
             )
             return
@@ -152,7 +189,7 @@ class FoxRoseHandler:
         elif text.startswith("⏳"):
             # Extract duration (e.g., "15 Mins" or "1 Hour")
             duration_text = text.replace("⏳ ", "")
-            self.router.route_event(UserSnoozeEvent(user, duration_text))
+            self.router.route_event(UserSnoozeEvent(user=user, value=duration_text))
 
             await update.message.reply_text(
                 f"Notifications snoozed for {duration_text}.",
@@ -162,7 +199,7 @@ class FoxRoseHandler:
         
         # User wants to Unsnooze or Cancel
         elif text in ["⏰ Unsnooze", "❌ Cancel"]:
-            self.router.route_event(UserSnoozeEvent(user, None))
+            self.router.route_event(UserSnoozeEvent(user=user, value=None))
             await update.message.reply_text(
                 "Back to normal mode.",
                 reply_markup=self.build_persistent_keyboard(user)

@@ -14,4 +14,9 @@ logger = logging.getLogger(__name__)
 class ConsoleSink(NotificationSink):
 
     def send(self, user:User, message: str, payload: dict|bytes, silent: bool):
-        logger.info(f"{user=!s} {message=} {payload=} {silent=}")
+        if isinstance(payload, bytes):
+            logger.info(f"{user=!s} {message=} payload=<<BYTES>> {silent=}")
+        else:
+            logger.info(f"{user=!s} {message=} {payload=} {silent=}")
+        
+            
