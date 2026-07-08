@@ -77,6 +77,7 @@ class TemperatureSystem:
         reading = self.get_tracker(device).add_reading(temp, timestamp)
         # if TemperatureTrend.RISING == reading:
         #     self.state.route_event(TemperatureRisingEvent())
+        return reading
     
     def get_latest_readings(self):
         r = []

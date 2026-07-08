@@ -2,3 +2,6 @@ paho-mqtt
 requests
 python-telegram-bot
 colorama
+humanize
+pytest
+pytest-cov

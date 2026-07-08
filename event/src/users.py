@@ -65,7 +65,7 @@ class User:
             raise TypeError("snooze_time must be a datetime object")
         self._snooze_time = new_time
 
-    def snooze_for(self, duration: timedelta) -> None:
+    def snooze_for(self, duration: int|float) -> None:
         self.snooze_until(datetime.now() + timedelta(seconds=duration))
 
     def has_camera_interest(self, camera_name:str) -> bool:
@@ -134,8 +134,11 @@ class UserManager:
         for user_attributes in users_as_env.split(';'):
             user, *attributes = user_attributes.split(':')
 
-            telegram_id = int(next((attribute for attribute in attributes if attribute.startswith('T')), "").lstrip('T'))
-            keycards = next((attribute for attribute in attributes if attribute.startswith('K')), "").lstrip('K').split(',')
+            telegram_attr = next((attribute for attribute in attributes if attribute.startswith('T')), None)
+            telegram_id = int(telegram_attr.lstrip('T')) if telegram_attr else None
+            
+            keycard_attr = next((attribute for attribute in attributes if attribute.startswith('K')), None)
+            keycards = keycard_attr.lstrip('K').split(',') if keycard_attr else []
 
             users.append(User(user, telegram_id, keycards))
 

@@ -42,7 +42,7 @@ class UserSettingChangedEventHandler:
             event.user.set_camera_interest(event.settings_value, event.value)
 
         if event.settings_type == UserSettingsType.MODE:
-            event.user.set_camera_interest(event.settings_value, event.value)
+            self.state.set_user_mode(event.user, event.value)
 
 class SnoozeEventHandler:
     def __init__(self, router, state_manager):
@@ -72,8 +72,8 @@ class SnoozeEventHandler:
             event.user.snooze_for(duration)
             return
 
-        if isinstance(self.value, (int, float)):
-            event.user.snooze_for(self.value)
+        if isinstance(event.value, (int, float)):
+            event.user.snooze_for(event.value)
             return
 
 class ModeToggleEventHandler:
