@@ -3,7 +3,6 @@ from telegram import Update, ReplyKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
-import logging
 import requests
 from modes import Mode
 import time
@@ -14,17 +13,7 @@ from events.doorcard_event import DoorCardEvent
 from events.device_event import BatteryEvent, LowBatteryEvent
 import io
 from users import User
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
-
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("telegram").setLevel(logging.WARNING)
+from logging_config import logger
 import humanize
 import datetime
 from sinks.base import NotificationSink

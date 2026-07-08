@@ -6,17 +6,9 @@ import datetime
 from dataclasses import dataclass, field
 
 from colorama import Fore
-import logging
+from logging_config import logger
 
 from sensors import Sensor, SensorType
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class DetectionEvent(Event):
@@ -121,7 +113,7 @@ class CameraActiveEventHandler:
         event = self.active_events[event_id]
         event_duration = event.last_update - event._create_time
         confidence = DetectionConfidence.from_duration(event_duration)
-        logging.info(f"Loitering confidence for {event_id} is {confidence} "
+        logger.info(f"Loitering confidence for {event_id} is {confidence} "
                      f"because it's been active for {event_duration} seconds in {len(event.updates)} updates.")
 
         if event_id not in self.triggering_events:

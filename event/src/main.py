@@ -1,13 +1,9 @@
 import sys
 import os
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-from pathlib  import Path
-logger = logging.getLogger(__name__)
+from pathlib import Path
+
+# Import and setup centralized logging (this also imports logger)
+from logging_config import setup_logging, logger
 
 from dotenv import load_dotenv
 

@@ -1,22 +1,14 @@
 import paho.mqtt.client as mqtt
 from routing.router import NotificationRouter
-import logging
 from abc import abstractmethod
 from typing import Self
 import json
+from logging_config import logger
 from events.afval_event import AfvalEvent
 from events.change_event import UserSettingsChangedEvent, UserSettingsType
 from events.detection_event import CameraActiveEventHandler, CameraDetectionEvent, PresenceDetectionEvent
 from events.doorcard_event import DoorCardEvent
 from events.device_event import BatteryEvent, LowBatteryEvent, TemperatureEvent
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
 
 class MQTTDispatcher:
     def __init__(self, state_manager, router, address):

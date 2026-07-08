@@ -3,5 +3,6 @@ requests
 python-telegram-bot
 colorama
 humanize
+loguru
 pytest
 pytest-cov

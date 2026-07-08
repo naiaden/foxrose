@@ -5,15 +5,8 @@ from routing.rules import ROUTING_RULES, routing_rule, DeliveryType
 from events.doorcard_event import DoorCardEvent
 from events.detection_event import CameraDetectionEvent, DetectionEvent, OutdoorPresenceDetectionEvent, IndoorPresenceDetectionEvent, PresenceDetectionEvent
 from events.device_event import DeviceEvent, BatteryEvent, LowBatteryEvent, TemperatureEvent
-import logging
+from logging_config import logger
 from sensors import Sensor, SensorType
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
 
 from modes import Mode
 

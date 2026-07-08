@@ -5,14 +5,7 @@ from colorama import Fore, Style
 
 from dataclasses import dataclass, field
 
-import logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
+from logging_config import logger
 
 @dataclass(frozen=True)
 class Event:

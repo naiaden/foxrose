@@ -4,15 +4,7 @@ from modes import Mode
 from events.event import Event
 from events.detection_event import CameraDetectionEvent, PresenceDetectionEvent
 
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
+from logging_config import logger
 
 class User:
     def __init__(self, name:str, telegram_user_id:int=None, keycards:List[str]=None):

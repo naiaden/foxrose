@@ -1,14 +1,6 @@
 from typing import Dict, List, Any, Set
 from datetime import datetime
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
+from logging_config import logger
 
 from enum import Enum
 from users import UserManager, User

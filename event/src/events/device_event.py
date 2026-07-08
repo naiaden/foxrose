@@ -5,15 +5,7 @@ import time
 from dataclasses import dataclass, field
 
 from colorama import Fore
-import logging
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
+from logging_config import logger
 
 @dataclass(frozen=True)
 class DeviceEvent(Event):

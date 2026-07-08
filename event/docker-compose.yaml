@@ -20,5 +20,9 @@ services:
       - BOT_NAME=${BOT_NAME}
       - ALLOWED_USERS=${ALLOWED_USERS}
       - FRIGATE_CAMERAS=${FRIGATE_CAMERAS}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - LOG_FILE=${LOG_FILE}
+    volumes:
+      - ./logs:/var/log/foxrose
     restart: on-failure
 

@@ -1,7 +1,6 @@
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 import os
-import logging
 import requests
 from modes import Mode
 
@@ -9,19 +8,10 @@ from events.change_event import UserModeToggleEvent, UserSettingsChangedEvent, U
 
 import io
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("telegram").setLevel(logging.WARNING)
+from logging_config import logger
 
 from sinks.base import NotificationSink
 from users import User
-
-logger = logging.getLogger(__name__)
 
 class TelegramSink(NotificationSink):
     def __init__(self, bot_token: str):
@@ -52,16 +42,16 @@ class TelegramSink(NotificationSink):
         
         try:
             response = requests.post(url, data=data)
-            logging.debug(f"Sent text message to {chat_id}: {response.status_code}")
+            logger.debug(f"Sent text message to {chat_id}: {response.status_code}")
 
             response_json = response.json()
             if response_json.get("ok"):
                 return response_json["result"]["message_id"]
             else:
-                logging.error(f"Telegram API Error: {response_json.get('description')}")
+                logger.error(f"Telegram API Error: {response_json.get('description')}")
                 return None
         except Exception as e:
-            logging.error(f"Error sending text to Telegram: {e}")
+            logger.error(f"Error sending text to Telegram: {e}")
             return None
 
 
@@ -78,9 +68,9 @@ class TelegramSink(NotificationSink):
         
         try:
             response = requests.post(url, files=files, data=data)
-            # logging.debug(f"Sent snapshot from {camera_name}: {response.status_code}")
+            logger.debug(f"Sent snapshot from {camera_name}: {response.status_code}")
         except Exception as e:
-            logging.error(f"Error sending to Telegram: {e}")
+            logger.error(f"Error sending to Telegram: {e}")
 
 
     def pin_message(self, chat_id: int, message_id: int, disable_notification: bool = False):
@@ -99,11 +89,11 @@ class TelegramSink(NotificationSink):
             response_json = response.json()
             
             if response_json.get("ok"):
-                logging.debug(f"Successfully pinned message {message_id}")
+                logger.debug(f"Successfully pinned message {message_id}")
                 return True
             else:
-                logging.error(f"Failed to pin message: {response_json.get('description')}")
+                logger.error(f"Failed to pin message: {response_json.get('description')}")
                 return False
         except Exception as e:
-            logging.error(f"Error pinning message: {e}")
+            logger.error(f"Error pinning message: {e}")
             return False

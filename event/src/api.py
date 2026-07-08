@@ -2,7 +2,7 @@ import paho.mqtt.client as mqtt
 import json
 import requests
 import os
-import logging
+from logging_config import logger
 from systems.telegram import FoxRoseHandler
 from systems.dahua import get_snapshot
 from modes import Mode
@@ -12,14 +12,6 @@ from events.detection_event import CameraActiveEventHandler, CameraDetectionEven
 from events.doorcard_event import DoorCardEvent
 from events.device_event import BatteryEvent, LowBatteryEvent
 import time
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
 
 logger.info("start foxrose event handler")
 
@@ -80,8 +72,7 @@ mqtts.on_message = on_message_second
 bot = FoxRoseHandler(system)
 
 
-logging.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
-
+logger.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
 logger.info(f"{MQTT_SERVER=}")
 logger.info(f"{MQTT_SERVER_SECOND=}")
 
@@ -92,7 +83,7 @@ try:
     mqtts.loop_start()
 
     system.notification_system.mqtt_publish_server = mqttc
-    logging.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
+    logger.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
 
     bot.run()
 

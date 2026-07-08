@@ -1,15 +1,7 @@
-import logging
+from logging_config import logger
 
 from sinks.base import NotificationSink
 from users import User
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
-
-logger = logging.getLogger(__name__)
 
 class ConsoleSink(NotificationSink):
 
