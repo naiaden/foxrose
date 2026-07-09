@@ -86,43 +86,43 @@ All non-sensitive configuration is stored in `config.yaml`:
 ```yaml
 # MQTT Configuration
 mqtt:
-  main_server: "192.168.88.23"
-  frigate_server: "192.168.88.22"
+  main_server: "192.168.1.100"
+  frigate_server: "192.168.1.101"
 
 # Door stations
 doors:
-  achterdeur:
-    ip: "192.168.88.200"
+  back_door:
+    ip: "192.168.1.10"
     account: "admin"
-    password: "w4chtwoord"
+    password: "your_password"
 
 # Users configuration
 users:
-  - name: louis
-    telegram_id: 11799898
+  - name: alice
+    telegram_id: 123456789
     keycards:
-      - 22337d12
-      - b4130231
-  - name: ruth
-    telegram_id: 164900585
+      - card_id_1
+      - card_id_2
+  - name: bob
+    telegram_id: 987654321
     keycards:
-      - 84f6f930
+      - card_id_3
 
 # Valid doorcard IDs (for access control)
 valid_doorcards:
-  - b4130231
-  - 14a1f930
+  - card_id_1
+  - card_id_2
 
 # Frigate cameras
 frigate_cameras:
-  - achterdeur
-  - tuinhuis
-  - voordeur
+  - back_door
+  - patio
+  - front_door
 
 # Temperature sensors
 thermometers:
-  "0xa4c13805db71defe": Rosa
-  "0xa4c13849284553bd": Finn
+  "0x_sensor_id_1": "Living Room"
+  "0x_sensor_id_2": "Bedroom"
 ```
 
 ### .env (Secrets only)
