@@ -1,20 +1,26 @@
 import paho.mqtt.client as mqtt
-from routing.router import NotificationRouter
 from abc import abstractmethod
 from typing import Self
 import json
 from logging_config import logger
-from events.afval_event import AfvalEvent
-from events.change_event import UserSettingsChangedEvent, UserSettingsType
-from events.detection_event import CameraActiveEventHandler, CameraDetectionEvent, PresenceDetectionEvent
-from events.doorcard_event import DoorCardEvent
-from events.device_event import BatteryEvent, LowBatteryEvent, TemperatureEvent
+
+from events import (
+    AfvalEvent,
+    UserSettingsChangedEvent,
+    UserSettingsType,
+    CameraDetectionEvent,
+    PresenceDetectionEvent,
+    DoorCardEvent,
+    BatteryEvent,
+    TemperatureEvent,
+)
+
 
 class MQTTDispatcher:
     def __init__(self, state_manager, router, address):
         self.state = state_manager
         self.router = router
-        
+
         self.ip = address
 
         self.mqtt_client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -39,6 +45,7 @@ class MQTTDispatcher:
     def on_message_handler(self, client, userdata, msg):
         pass
 
+
 class MQTTMainDispatcher(MQTTDispatcher):
     def __init__(self, state_manager, router, address):
         super().__init__(state_manager, router, address)
@@ -47,16 +54,16 @@ class MQTTMainDispatcher(MQTTDispatcher):
 
     def on_connect_handler(self, client, userdata, flags, reason_code, properties=None):
         logger.info(f"Connected to main with result code {reason_code}")
-        client.subscribe("DahuaVTO/DoorCard/Event/#") 
-        client.subscribe("DahuaVTO/Invite/Event/#") 
+        client.subscribe("DahuaVTO/DoorCard/Event/#")
+        client.subscribe("DahuaVTO/Invite/Event/#")
         client.subscribe("zigbee2mqtt/+")
-        client.subscribe(f"foxrosehip/bot/users/+/cameras/+")
+        client.subscribe("foxrosehip/bot/users/+/cameras/+")
         client.subscribe("foxrosehip/afval")
 
     def on_message_handler(self, client, userdata, msg):
-        logger.debug(msg.topic+" "+str(msg.payload))
+        logger.debug(msg.topic + " " + str(msg.payload))
 
-        if msg.topic.startswith(f"foxrosehip/bot/users/"):
+        if msg.topic.startswith("foxrosehip/bot/users/"):
             self._handle_from_bot(msg)
         elif msg.topic.startswith("zigbee2mqtt"):
             self._handle_from_device(msg)
@@ -70,12 +77,13 @@ class MQTTMainDispatcher(MQTTDispatcher):
                 self._handle_afval(msg)
 
     def _handle_afval(self, msg):
+        logger.debug("Afval!")
         self.router.route_event(AfvalEvent(msg.payload))
 
     def _handle_doorcard(self, msg):
         payload = json.loads(msg.payload.decode())
 
-        self.router.route_event(DoorCardEvent(payload['Data']['Number']))
+        self.router.route_event(DoorCardEvent(payload["Data"]["Number"]))
 
     def _handle_from_bot(self, msg):
         parts = msg.topic.split("/")
@@ -84,19 +92,23 @@ class MQTTMainDispatcher(MQTTDispatcher):
         enabled = msg.payload.decode().strip() == "1"
 
         if user:
-            self.router.route_event(UserSettingsChangedEvent(user, UserSettingsType.CAMERA_PREFERENCE, camera, enabled))
+            self.router.route_event(
+                UserSettingsChangedEvent(
+                    user, UserSettingsType.CAMERA_PREFERENCE, camera, enabled
+                )
+            )
 
     def _handle_from_device(self, msg):
-        device = msg.topic.split('/')[1]
+        device = msg.topic.split("/")[1]
         payload = json.loads(msg.payload.decode())
 
-        if percentage := payload.get('battery', None):
+        if percentage := payload.get("battery", None):
             self.router.route_event(BatteryEvent(device, percentage))
 
-        if temperature := payload.get('temperature', None):
+        if temperature := payload.get("temperature", None):
             self.router.route_event(TemperatureEvent(device, temperature))
 
-        if presence := payload.get("presence", None):
+        if payload.get("presence", None):
             self.router.route_event(PresenceDetectionEvent(device))
 
 
@@ -105,7 +117,6 @@ class MQTTFrigateDispatcher(MQTTDispatcher):
         super().__init__(state_manager, router, address)
 
         self._name = "frigate"
-
 
     def on_connect_handler(self, client, userdata, flags, reason_code, properties=None):
         logger.debug(f"Connected to second (frigate) with result code {reason_code}")
@@ -121,12 +132,11 @@ class MQTTFrigateDispatcher(MQTTDispatcher):
             self._handle_person_detected(msg)
 
     def _handle_frigate_event(self, msg):
-        payload = json.loads(msg.payload.decode())
+        json.loads(msg.payload.decode())
         # self.router.route_event(system.camera_active_event_handler.process(system, payload["after"]["id"], payload["after"]["camera"], payload))
 
     def _handle_person_detected(self, msg):
-        parts = msg.topic.split('/')
+        parts = msg.topic.split("/")
         camera_name = parts[1]
-        
+
         self.router.route_event(CameraDetectionEvent(camera_name, msg.payload))
-    

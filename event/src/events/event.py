@@ -5,7 +5,6 @@ from colorama import Fore, Style
 
 from dataclasses import dataclass, field
 
-from logging_config import logger
 
 @dataclass(frozen=True)
 class Event:
@@ -22,10 +21,10 @@ class Event:
         return f"[{self.create_time_str}] Event"
 
 
-
 def color_wrap(func):
     @wraps(func)
     def wrapper(self, *args, **kwargs):
         original_string = func(self, *args, **kwargs)
         return f"{self._SS}{original_string}{self._SE}"
+
     return wrapper

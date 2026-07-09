@@ -1,11 +1,7 @@
 from events.event import Event, color_wrap
-from enum import Enum, auto
-import time
-
 from dataclasses import dataclass, field
-
 from colorama import Fore
-from logging_config import logger
+
 
 @dataclass(frozen=True)
 class DeviceEvent(Event):
@@ -15,14 +11,16 @@ class DeviceEvent(Event):
     def __str__(self):
         return f"[{self.create_time_str}] DeviceEvent"
 
+
 @dataclass(frozen=True)
 class BatteryEvent(DeviceEvent):
-    device : str
-    percentage : int
+    device: str
+    percentage: int
 
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] BatteryEvent [{self.device}]: {self.percentage}%)"
+
 
 @dataclass(frozen=True)
 class LowBatteryEvent(BatteryEvent):
@@ -31,14 +29,16 @@ class LowBatteryEvent(BatteryEvent):
     def __str__(self):
         return f"[{self.create_time_str}] LowBatteryEvent [{self.device}]: {self.percentage}%)"
 
+
 @dataclass(frozen=True)
 class TemperatureEvent(DeviceEvent):
-    device : str
-    temperature : float
+    device: str
+    temperature: float
 
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] TemperatureEvent [{self.device}]: {self.temperature}*)"
+
 
 @dataclass(frozen=True)
 class TemperatureRisingEvent(DeviceEvent):
@@ -47,6 +47,7 @@ class TemperatureRisingEvent(DeviceEvent):
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] TemperatureRisingEvent [{self.device}]: {self.temperature}*)"
+
 
 @dataclass(frozen=True)
 class HighTemperatureEvent(DeviceEvent):

@@ -1,28 +1,20 @@
+# DEPRECATED: This is a legacy entry point. Use main.py instead.
+# The new configuration system uses config.yaml instead of environment variables.
+# ruff: noqa
 import paho.mqtt.client as mqtt
-import json
-import requests
 import os
 from logging_config import logger
 from systems.telegram import FoxRoseHandler
-from systems.dahua import get_snapshot
-from modes import Mode
 
-from events.change_event import UserSettingsChangedEvent, UserSettingsType
-from events.detection_event import CameraActiveEventHandler, CameraDetectionEvent
-from events.doorcard_event import DoorCardEvent
-from events.device_event import BatteryEvent, LowBatteryEvent
-import time
+from events.detection_event import CameraActiveEventHandler
 
-logger.info("start foxrose event handler")
-
-
+logger.info("start foxrose event handler (legacy entry point)")
 
 
 from events import *
 
-
-MQTT_SERVER = os.environ['mqtt_server']
-MQTT_SERVER_SECOND = os.environ['mqtt_server_second']
+MQTT_SERVER = os.environ["mqtt_server"]
+MQTT_SERVER_SECOND = os.environ["mqtt_server_second"]
 
 
 mqttc = None
@@ -31,15 +23,24 @@ mqtts = None
 from systems.camera import CameraSystem
 from systems.notification import NotificationSystem
 
+
 class System:
     def __init__(self):
-        self.allowed_users = [int(uid.strip()) for uid in os.environ['ALLOWED_USERS'].split(',')]
-        self.valid_doorcards = os.environ['VALID_DOORCARDS'].split(',')
-        self.key_map = {k: v.split(',') for x in os.environ['KEY_MAP'].split(';') for k, v in [x.split(':')]}
+        self.allowed_users = [
+            int(uid.strip()) for uid in os.environ["ALLOWED_USERS"].split(",")
+        ]
+        self.valid_doorcards = os.environ["VALID_DOORCARDS"].split(",")
+        self.key_map = {
+            k: v.split(",")
+            for x in os.environ["KEY_MAP"].split(";")
+            for k, v in [x.split(":")]
+        }
 
         self.camera_system = CameraSystem()
         self.camera_active_event_handler = CameraActiveEventHandler()
-        self.notification_system = NotificationSystem(self.allowed_users, self.camera_system.captured_cameras, mqttc)
+        self.notification_system = NotificationSystem(
+            self.allowed_users, self.camera_system.captured_cameras, mqttc
+        )
 
 
 system = System()
@@ -48,17 +49,7 @@ system = System()
 #     requests.post(f'http://{settings["loxone_server"]}/dev/sps/io/mqtt_deurbel_gaat/1')
 
 
-
-
-    
-
-
-    
-        
-
-    
-
-logger.info('init')
+logger.info("init")
 
 mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 mqttc.enable_logger(logger)
@@ -96,7 +87,6 @@ except KeyboardInterrupt:
     logger.info("Stopping...")
     mqttc.loop_stop()
     mqtts.loop_stop()
-
 
 
 # {

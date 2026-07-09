@@ -1,14 +1,6 @@
-import requests
-import os
-from events.event import Event, color_wrap
-from events.change_event import UserModeToggleEvent
-
-LIGHTAPI_SERVER = os.environ['lightapi_server']
-
-from dataclasses import dataclass, field
-
+from events.event import Event
+from dataclasses import dataclass
 from colorama import Fore
-from logging_config import logger
 
 
 @dataclass(frozen=True)

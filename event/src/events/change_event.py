@@ -1,10 +1,14 @@
+from __future__ import annotations
+
 from events.event import Event, color_wrap
 from enum import Enum, auto
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
 from dataclasses import dataclass
-from users import User
 from colorama import Fore
-from logging_config import logger
+
+if TYPE_CHECKING:
+    from users import User
+
 
 @dataclass(frozen=True)
 class ChangeEvent(Event):
@@ -13,6 +17,7 @@ class ChangeEvent(Event):
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] ChangeEvent"
+
 
 @dataclass(frozen=True)
 class SettingsChangedEvent(ChangeEvent):
@@ -26,6 +31,7 @@ class UserSettingsType(Enum):
     MODE = auto()
     SNOOZE = auto()
 
+
 @dataclass(frozen=True)
 class UserSettingsChangedEvent(ChangeEvent):
     user: User
@@ -37,10 +43,11 @@ class UserSettingsChangedEvent(ChangeEvent):
     def __str__(self):
         return f"[{self.create_time_str}] UserSettingsChangedEvent: {self.user} {self.settings_type} {self.settings_value} {self.value}"
 
+
 @dataclass(frozen=True)
 class UserSnoozeEvent(UserSettingsChangedEvent):
     settings_type: UserSettingsType = UserSettingsType.SNOOZE
-    value: int|float
+    value: int | float
 
     @color_wrap
     def __str__(self):

@@ -4,25 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
-      - mqtt_server=${mqtt_server}
-      - mqtt_server_second=${mqtt_server_second}
-      - lightapi_server=${lightapi_server}
-      - ACHTERDEUR_IP=${ACHTERDEUR_IP}
-      - ACHTERDEUR_ACCOUNT=${ACHTERDEUR_ACCOUNT}
-      - ACHTERDEUR_PASSWORD=${ACHTERDEUR_PASSWORD}
-      - VOORDEUR_IP=${VOORDEUR_IP}
-      - VOORDEUR_ACCOUNT=${VOORDEUR_ACCOUNT}
-      - VOORDEUR_PASSWORD=${VOORDEUR_PASSWORD}
-      - DOORBELL_TOPIC=${DOORBELL_TOPIC}
-      - VALID_DOORCARDS=${VALID_DOORCARDS}
       - BOT_TOKEN=${BOT_TOKEN}
-      - KEY_MAP=${KEY_MAP}
-      - BOT_NAME=${BOT_NAME}
-      - ALLOWED_USERS=${ALLOWED_USERS}
-      - FRIGATE_CAMERAS=${FRIGATE_CAMERAS}
       - LOG_LEVEL=${LOG_LEVEL}
       - LOG_FILE=${LOG_FILE}
     volumes:
       - ./logs:/var/log/foxrose
+      - ./config.yaml:/code/config.yaml:ro
     restart: on-failure
-

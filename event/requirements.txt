@@ -6,3 +6,7 @@ humanize
 loguru
 pytest
 pytest-cov
+pyyaml
+ruff
+black
+pre-commit

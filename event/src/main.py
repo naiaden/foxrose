@@ -1,71 +1,62 @@
-import sys
 import os
 from pathlib import Path
-
-# Import and setup centralized logging (this also imports logger)
-from logging_config import setup_logging, logger
-
 from dotenv import load_dotenv
 
-base_dir = Path(__file__).resolve().parent.parent
-print(base_dir)
-
-load_dotenv(base_dir / ".env.dev")
+# Import and setup centralized logging (this also imports logger)
+from logging_config import logger
 
 from sinks.telegram import TelegramSink
 from sinks.console import ConsoleSink
 
-from events.doorcard_event import DoorCardEvent
-from events.change_event import UserModeToggleEvent, UserSnoozeEvent
-
-from routing.router import CameraDetectionEventHandler, AfvalEventHandler, PresenceDetectionEventHandler, TemperatureEventHandler, UserSettingChangedEventHandler,NotificationRouter, DoorcardEventHandler, DeviceEventHandler, ModeToggleEventHandler, SnoozeEventHandler
+from routing.router import NotificationRouter
+from routing.event_handlers import (
+    AfvalEventHandler,
+    DoorcardEventHandler,
+    PresenceDetectionEventHandler,
+    CameraDetectionEventHandler,
+    DeviceEventHandler,
+    SnoozeEventHandler,
+    ModeToggleEventHandler,
+    UserSettingChangedEventHandler,
+    TemperatureEventHandler,
+)
 from handlers.mqtt import MQTTMainDispatcher, MQTTFrigateDispatcher
-from users import UserManager
 from state import StateManager
 from handlers.telegram import FoxRoseHandler
-from sensors import Sensor
+from config import load_config
+
 
 def main():
+    # Load environment variables from .env file
+    base_dir = Path(__file__).resolve().parent.parent
+    load_dotenv(base_dir / ".env")
+
     logger.info("Initialising FOXROSE")
 
-    try:
-        users = os.environ['USERS']
-        allowed_users = os.environ['ALLOWED_USERS'].split(',')
-        valid_doorcards = os.environ['VALID_DOORCARDS'].split(',')
-        sensors = [ (s.split(":")[0], s.split(":")[1], s.split(":")[2]) for s in os.environ['SENSORS'].split(";")]
-        cameras = os.environ['FRIGATE_CAMERAS'].split(',')
-        thermometers = {pair.split(":")[0]: pair.split(":")[1] for pair in os.environ['THERMOMETER'].split(";")}
+    # Load configuration from YAML file
+    config_path = os.environ.get("CONFIG_PATH", "config.yaml")
+    config = load_config(config_path)
 
-        telegram_token = os.environ['BOT_TOKEN']
+    # Get secrets from environment
+    telegram_token = os.environ.get("BOT_TOKEN")
+    if not telegram_token:
+        logger.critical("Missing BOT_TOKEN environment variable")
+        return
 
-        mqtt_server_main = os.environ['mqtt_server']
-        mqtt_server_frigate = os.environ['mqtt_server_second']
-    except KeyError as e:
-        logger.critical(f"Missing required environment variable: {e}")
-        sys.exit(1)
-
-    
-
+    # Build state manager from config
     state_manager = StateManager(
-        users=UserManager.from_env_string(users),
-        allowed_users=allowed_users,
-        valid_doorcards=valid_doorcards,
-        sensors=sensors,
-        cameras=cameras,
-        thermometers=thermometers,
+        users=config.users,
+        valid_doorcards=set(config.valid_doorcards),
+        sensors=config.sensors,
+        cameras=config.frigate_cameras,
+        thermometers=config.thermometers,
     )
 
-    notification_sinks = [
-        TelegramSink(bot_token=os.environ['BOT_TOKEN']),
-        ConsoleSink()
-    ]
+    notification_sinks = [TelegramSink(bot_token=telegram_token), ConsoleSink()]
 
-    router = NotificationRouter(
-        state_manager=state_manager,
-        sinks=notification_sinks
-    )
+    router = NotificationRouter(state_manager=state_manager, sinks=notification_sinks)
 
-    handler_classes = (
+    for handler in (
         AfvalEventHandler,
         DoorcardEventHandler,
         PresenceDetectionEventHandler,
@@ -75,18 +66,14 @@ def main():
         ModeToggleEventHandler,
         UserSettingChangedEventHandler,
         TemperatureEventHandler,
-    )
-    handlers = [handler(router, state_manager) for handler in handler_classes]
+    ):
+        handler(router, state_manager)
 
-    main_dispatcher = MQTTMainDispatcher(
-        state_manager=state_manager,
-        router=router,
-        address=mqtt_server_main
+    MQTTMainDispatcher(
+        state_manager=state_manager, router=router, address=config.mqtt.main_server
     ).connect()
-    frigate_dispatcher = MQTTFrigateDispatcher(
-        state_manager=state_manager,
-        router=router,
-        address=mqtt_server_frigate
+    MQTTFrigateDispatcher(
+        state_manager=state_manager, router=router, address=config.mqtt.frigate_server
     ).connect()
 
     bot = FoxRoseHandler(state_manager, router, telegram_token)
@@ -94,5 +81,6 @@ def main():
 
     logger.info("Initialization complete. Starting application block...")
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     main()
