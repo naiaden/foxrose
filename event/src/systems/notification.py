@@ -27,7 +27,6 @@ class NotificationDecision:
 
 
 class NotificationSystem:
-
     def __init__(self, users, cameras, publish_client):
 
         self.user_prefs_cache = {

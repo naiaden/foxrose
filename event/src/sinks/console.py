@@ -5,7 +5,6 @@ from users import User
 
 
 class ConsoleSink(NotificationSink):
-
     def send(
         self,
         user: User,

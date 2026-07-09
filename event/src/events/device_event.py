@@ -24,7 +24,6 @@ class BatteryEvent(DeviceEvent):
 
 @dataclass(frozen=True)
 class LowBatteryEvent(BatteryEvent):
-
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] LowBatteryEvent [{self.device}]: {self.percentage}%)"
@@ -51,7 +50,6 @@ class TemperatureRisingEvent(DeviceEvent):
 
 @dataclass(frozen=True)
 class HighTemperatureEvent(DeviceEvent):
-
     @color_wrap
     def __str__(self):
         return f"[{self.create_time_str}] HighTemperatureEvent [{self.device}]: {self.temperature}*)"

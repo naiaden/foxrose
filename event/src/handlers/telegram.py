@@ -111,7 +111,7 @@ class FoxRoseHandler:
             [f"- {key}: {value}" for key, value in user._camera_preferences.items()]
         )
         x = [
-            f"{device} - {reading.as_emoji()}{temp} - ({round(temp-avg,2) if avg else '--'})"
+            f"{device} - {reading.as_emoji()}{temp} - ({round(temp - avg, 2) if avg else '--'})"
             for device, (
                 _,
                 temp,

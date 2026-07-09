@@ -5,7 +5,6 @@ from colorama import Fore
 
 @dataclass(frozen=True)
 class DoorCardEvent(Event):
-
     card_number: str
 
     _SS = f"{Fore.MAGENTA}"

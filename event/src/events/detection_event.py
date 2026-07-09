@@ -10,7 +10,6 @@ from sensors import Sensor
 
 @dataclass(frozen=True)
 class DetectionEvent(Event):
-
     _SS = f"{Fore.YELLOW}"
 
     @color_wrap
