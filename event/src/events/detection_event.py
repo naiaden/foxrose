@@ -113,3 +113,12 @@ class OutdoorPresenceDetectionEvent(PresenceDetectionEvent):
         return (
             f"[{self.create_time_str}] OutdoorPresenceDetectionEvent on {self.device}"
         )
+
+
+@dataclass(frozen=True)
+class PresenceWindowStartedEvent(DetectionEvent):
+    device: Sensor
+
+    @color_wrap
+    def __str__(self):
+        return f"[{self.create_time_str}] PresenceWindowStartedEvent on {self.device}"

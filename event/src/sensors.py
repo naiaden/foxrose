@@ -67,6 +67,17 @@ class SensorSystem:
             return True
         return (current_time - last_routed) >= self.window_timeout
 
+    def is_new_window(self, sensor_id: str, current_time: float) -> bool:
+        """Check if this event starts a new window (after window expiration, not first time).
+
+        Returns True if a previous window has expired and this is the start of a new one.
+        """
+        last_routed = self.last_routed_events.get(sensor_id, 0)
+        # If no event has been routed yet, this is not a "new window" (it's the first)
+        if last_routed == 0:
+            return False
+        return (current_time - last_routed) >= self.window_timeout
+
     def mark_event_routed(self, sensor_id: str, timestamp: float):
         """Record that an event was routed for this sensor."""
         self.last_routed_events[sensor_id] = timestamp

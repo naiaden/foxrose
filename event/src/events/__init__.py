@@ -17,6 +17,7 @@ from events.detection_event import (
     PresenceDetectionEvent,
     IndoorPresenceDetectionEvent,
     OutdoorPresenceDetectionEvent,
+    PresenceWindowStartedEvent,
 )
 from events.doorcard_event import DoorCardEvent
 from events.device_event import (
@@ -41,6 +42,7 @@ __all__ = [
     "PresenceDetectionEvent",
     "IndoorPresenceDetectionEvent",
     "OutdoorPresenceDetectionEvent",
+    "PresenceWindowStartedEvent",
     "DoorCardEvent",
     "DeviceEvent",
     "BatteryEvent",

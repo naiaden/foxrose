@@ -76,3 +76,7 @@ class StateManager:
     def mark_presence_event_routed(self, sensor_id: str, timestamp: float):
         """Record that a presence event was routed."""
         self._sensors.mark_event_routed(sensor_id, timestamp)
+
+    def is_new_presence_window(self, sensor_id: str, current_time: float) -> bool:
+        """Check if this event starts a new window (after window expiration, not first time)."""
+        return self._sensors.is_new_window(sensor_id, current_time)

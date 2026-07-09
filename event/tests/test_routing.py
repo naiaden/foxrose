@@ -30,6 +30,7 @@ from events.detection_event import (
     PresenceDetectionEvent,
     IndoorPresenceDetectionEvent,
     OutdoorPresenceDetectionEvent,
+    PresenceWindowStartedEvent,
 )
 from events.device_event import (
     DeviceEvent,
@@ -389,6 +390,8 @@ class TestPresenceDetectionEventHandler:
             device_id="sensor001", name="Living Room", sensor_type=SensorType.INDOOR
         )
         mock_state_manager.get_sensor.return_value = sensor
+        # Mock that this is not a new window (first event)
+        mock_state_manager.is_new_presence_window.return_value = False
 
         # Use a mock router to avoid the recursive call to handler
         mock_router = Mock()
@@ -402,6 +405,8 @@ class TestPresenceDetectionEventHandler:
         mock_state_manager.presence_detected.assert_called_once()
         # Should have routed IndoorPresenceDetectionEvent
         mock_router.route_event.assert_called_once()
+        call_args = mock_router.route_event.call_args[0][0]
+        assert isinstance(call_args, IndoorPresenceDetectionEvent)
 
     def test_presence_handler_routes_indoor_event(self, mock_state_manager, mock_sink):
         """PresenceDetectionEventHandler should route indoor presence events."""
@@ -411,6 +416,8 @@ class TestPresenceDetectionEventHandler:
             device_id="sensor001", name="Living Room", sensor_type=SensorType.INDOOR
         )
         mock_state_manager.get_sensor.return_value = sensor
+        # Mock that this is not a new window (first event)
+        mock_state_manager.is_new_presence_window.return_value = False
 
         # Use a mock router to avoid the recursive call to handler
         mock_router = Mock()
@@ -460,6 +467,8 @@ class TestPresenceDetectionEventHandler:
         mock_state_manager.get_sensor.return_value = sensor
         # Mock that we should route (after window)
         mock_state_manager.should_route_presence_event.return_value = True
+        # Mock that this is a new window (after window expiration)
+        mock_state_manager.is_new_presence_window.return_value = True
 
         mock_router = Mock()
         mock_router.route_event = Mock()
@@ -469,7 +478,39 @@ class TestPresenceDetectionEventHandler:
         event = PresenceDetectionEvent(device="sensor001")
         handler.handle_presence_event(event)
 
-        # Should have routed the event
-        mock_router.route_event.assert_called_once()
+        # Should have routed two events: PresenceWindowStartedEvent and IndoorPresenceDetectionEvent
+        assert mock_router.route_event.call_count == 2
+        # Check that PresenceWindowStartedEvent was routed first
+        first_call = mock_router.route_event.call_args_list[0][0][0]
+        assert isinstance(first_call, PresenceWindowStartedEvent)
+        # Check that IndoorPresenceDetectionEvent was routed second
+        second_call = mock_router.route_event.call_args_list[1][0][0]
+        assert isinstance(second_call, IndoorPresenceDetectionEvent)
         # Should have marked the event as routed
         mock_state_manager.mark_presence_event_routed.assert_called_once()
+
+    def test_presence_handler_routes_window_started_event(
+        self, mock_state_manager, mock_sink
+    ):
+        """PresenceDetectionEventHandler should route PresenceWindowStartedEvent when window expires."""
+        from sensors import Sensor, SensorType
+
+        sensor = Sensor(
+            device_id="sensor001", name="Living Room", sensor_type=SensorType.INDOOR
+        )
+        mock_state_manager.get_sensor.return_value = sensor
+        # Mock that we should route (after window)
+        mock_state_manager.should_route_presence_event.return_value = True
+        # Mock that this is a new window (after window expiration)
+        mock_state_manager.is_new_presence_window.return_value = True
+
+        mock_router = Mock()
+        mock_router.route_event = Mock()
+
+        handler = PresenceDetectionEventHandler(mock_router, mock_state_manager)
+
+        event = PresenceDetectionEvent(device="sensor001")
+        handler.handle_presence_event(event)
+
+        # Verify is_new_presence_window was called
+        mock_state_manager.is_new_presence_window.assert_called_once()

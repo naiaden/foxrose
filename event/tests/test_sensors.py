@@ -165,3 +165,40 @@ class TestSensorSystemWindow:
 
         system.mark_event_routed("sensor001", 500.0)
         assert system.last_routed_events.get("sensor001") == 500.0
+
+    def test_is_new_window_first_time(self, sample_sensors):
+        """is_new_window should return False for first event (no previous window)."""
+        system = SensorSystem(state=None, sensors=sample_sensors, window_timeout=300)
+
+        # First event should not be considered a "new window"
+        assert system.is_new_window("sensor001", 100.0) is False
+
+    def test_is_new_window_within_window(self, sample_sensors):
+        """is_new_window should return False within the window."""
+        system = SensorSystem(state=None, sensors=sample_sensors, window_timeout=300)
+
+        # First event
+        system.mark_event_routed("sensor001", 100.0)
+
+        # Event 100 seconds later (within 300s window) should not be a new window
+        assert system.is_new_window("sensor001", 200.0) is False
+
+    def test_is_new_window_after_window(self, sample_sensors):
+        """is_new_window should return True after window expiration."""
+        system = SensorSystem(state=None, sensors=sample_sensors, window_timeout=300)
+
+        # First event
+        system.mark_event_routed("sensor001", 100.0)
+
+        # Event 400 seconds later (after 300s window) should be a new window
+        assert system.is_new_window("sensor001", 500.0) is True
+
+    def test_is_new_window_different_sensors(self, sample_sensors):
+        """is_new_window should be False for sensors with no previous events."""
+        system = SensorSystem(state=None, sensors=sample_sensors, window_timeout=300)
+
+        # First sensor event
+        system.mark_event_routed("sensor001", 100.0)
+
+        # Second sensor should not be a new window (no previous window)
+        assert system.is_new_window("sensor002", 150.0) is False
