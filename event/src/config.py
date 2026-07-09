@@ -37,6 +37,7 @@ class Config:
     frigate_cameras: List[str]
     thermometers: Dict[str, str]
     sensors: List[Sensor]
+    presence_window_seconds: int = 300  # Default 5 minutes
 
 
 def load_config(config_path: str = "config.yaml") -> Config:
@@ -99,6 +100,9 @@ def load_config(config_path: str = "config.yaml") -> Config:
             )
         )
 
+    # Parse presence window timeout (default 300 seconds = 5 minutes)
+    presence_window_seconds = data.get("presence_window_seconds", 300)
+
     return Config(
         mqtt=mqtt,
         doors=doors,
@@ -108,4 +112,5 @@ def load_config(config_path: str = "config.yaml") -> Config:
         frigate_cameras=frigate_cameras,
         thermometers=thermometers,
         sensors=sensors,
+        presence_window_seconds=presence_window_seconds,
     )

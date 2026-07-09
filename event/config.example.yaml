@@ -56,3 +56,8 @@ sensors:
   - device_id: "002"
     name: "living_room"
     type: INDOOR
+
+# Presence event window timeout in seconds
+# Events from the same sensor within this window are suppressed
+# Default: 300 (5 minutes)
+# presence_window_seconds: 300

@@ -50,6 +50,7 @@ def main():
         sensors=config.sensors,
         cameras=config.frigate_cameras,
         thermometers=config.thermometers,
+        presence_window_seconds=config.presence_window_seconds,
     )
 
     notification_sinks = [TelegramSink(bot_token=telegram_token), ConsoleSink()]

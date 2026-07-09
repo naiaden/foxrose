@@ -17,6 +17,7 @@ class StateManager:
         sensors: List[Sensor],
         cameras: List[str],
         thermometers: Dict[str, str],
+        presence_window_seconds: int = 300,
     ):
         # All users in the config are allowed by default
         self.users = UserManager(
@@ -29,7 +30,9 @@ class StateManager:
         self._cameras = cameras
         self._temperatures = TemperatureSystem(self, thermometers)
 
-        self._sensors = SensorSystem(self, sensors)
+        self._sensors = SensorSystem(
+            self, sensors, window_timeout=presence_window_seconds
+        )
 
     def presence_detected(self, sensor, timestamp):
         return self._sensors.update_presence(sensor, timestamp)
@@ -65,3 +68,11 @@ class StateManager:
         self, device: str, temp: float, timestamp: datetime
     ) -> TemperatureTrend:
         return self._temperatures.add_reading(device, temp, timestamp)
+
+    def should_route_presence_event(self, sensor_id: str, current_time: float) -> bool:
+        """Check if a presence event should be routed (outside the window)."""
+        return self._sensors.should_route_event(sensor_id, current_time)
+
+    def mark_presence_event_routed(self, sensor_id: str, timestamp: float):
+        """Record that a presence event was routed."""
+        self._sensors.mark_event_routed(sensor_id, timestamp)

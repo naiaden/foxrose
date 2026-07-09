@@ -28,7 +28,7 @@ class Sensor:
 
 
 class SensorSystem:
-    def __init__(self, state, sensors: List[Sensor] = None):
+    def __init__(self, state, sensors: List[Sensor] = None, window_timeout: int = 300):
         self.state = state
 
         self.sensors = sensors or []
@@ -36,6 +36,8 @@ class SensorSystem:
         logger.info(f"Initialized {len(self.sensors)} sensors")
 
         self.last_updates = {}
+        self.last_routed_events = {}
+        self.window_timeout = window_timeout  # in seconds, default 5 minutes
 
     # def get_sensors(self):
 
@@ -53,3 +55,18 @@ class SensorSystem:
         self.last_updates[sensor.device_id] = max(
             timestamp, self.last_updates.get(sensor.device_id, 0)
         )
+
+    def should_route_event(self, sensor_id: str, current_time: float) -> bool:
+        """Check if enough time has passed since the last routed event.
+
+        Returns True if the event should be routed (new window), False if suppressed.
+        """
+        last_routed = self.last_routed_events.get(sensor_id, 0)
+        # If no event has been routed yet, allow this one
+        if last_routed == 0:
+            return True
+        return (current_time - last_routed) >= self.window_timeout
+
+    def mark_event_routed(self, sensor_id: str, timestamp: float):
+        """Record that an event was routed for this sensor."""
+        self.last_routed_events[sensor_id] = timestamp

@@ -101,3 +101,67 @@ class TestSensorSystem:
 
         sensor = system.get_sensor("sensor002")
         assert sensor.sensor_type == SensorType.OUTDOOR
+
+
+class TestSensorSystemWindow:
+    """Tests for presence event window logic."""
+
+    def test_should_route_event_first_time(self, sample_sensors):
+        """First event should always be routed."""
+        system = SensorSystem(state=None, sensors=sample_sensors, window_timeout=300)
+
+        # First event should be routed
+        assert system.should_route_event("sensor001", 100.0) is True
+
+    def test_should_route_event_within_window(self, sample_sensors):
+        """Event within window should not be routed."""
+        system = SensorSystem(state=None, sensors=sample_sensors, window_timeout=300)
+
+        # First event
+        system.mark_event_routed("sensor001", 100.0)
+
+        # Event 100 seconds later (within 300s window) should not be routed
+        assert system.should_route_event("sensor001", 200.0) is False
+
+    def test_should_route_event_after_window(self, sample_sensors):
+        """Event after window should be routed."""
+        system = SensorSystem(state=None, sensors=sample_sensors, window_timeout=300)
+
+        # First event
+        system.mark_event_routed("sensor001", 100.0)
+
+        # Event 400 seconds later (after 300s window) should be routed
+        assert system.should_route_event("sensor001", 500.0) is True
+
+    def test_should_route_event_different_sensors(self, sample_sensors):
+        """Events for different sensors should be independent."""
+        system = SensorSystem(state=None, sensors=sample_sensors, window_timeout=300)
+
+        # First sensor event
+        system.mark_event_routed("sensor001", 100.0)
+
+        # Second sensor should still be routed
+        assert system.should_route_event("sensor002", 150.0) is True
+
+    def test_should_route_event_custom_window(self, sample_sensors):
+        """Custom window timeout should be respected."""
+        system = SensorSystem(state=None, sensors=sample_sensors, window_timeout=60)
+
+        # First event
+        system.mark_event_routed("sensor001", 100.0)
+
+        # Event 30 seconds later (within 60s window) should not be routed
+        assert system.should_route_event("sensor001", 130.0) is False
+
+        # Event 60 seconds later (at window boundary) should be routed
+        assert system.should_route_event("sensor001", 160.0) is True
+
+    def test_mark_event_routed_updates_timestamp(self, sample_sensors):
+        """mark_event_routed should update the last_routed_events dict."""
+        system = SensorSystem(state=None, sensors=sample_sensors, window_timeout=300)
+
+        system.mark_event_routed("sensor001", 100.0)
+        assert system.last_routed_events.get("sensor001") == 100.0
+
+        system.mark_event_routed("sensor001", 500.0)
+        assert system.last_routed_events.get("sensor001") == 500.0

@@ -25,6 +25,20 @@ class PresenceDetectionEventHandler:
             self.state.presence_detected(sensor, event._create_time)
 
             if sensor:
+                # Check if we should route this event (outside the window)
+                if not self.state.should_route_presence_event(
+                    sensor.device_id, event._create_time
+                ):
+                    logger.debug(
+                        f"Suppressing presence event for {sensor!s} (within {self.state._sensors.window_timeout}s window)"
+                    )
+                    return
+
+                # Mark that we're routing this event
+                self.state.mark_presence_event_routed(
+                    sensor.device_id, event._create_time
+                )
+
                 if sensor.sensor_type == SensorType.INDOOR:
                     self.router.route_event(IndoorPresenceDetectionEvent(device=sensor))
 

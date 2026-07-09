@@ -425,3 +425,51 @@ class TestPresenceDetectionEventHandler:
         mock_router.route_event.assert_called_once()
         call_args = mock_router.route_event.call_args[0][0]
         assert isinstance(call_args, IndoorPresenceDetectionEvent)
+
+    def test_presence_handler_suppresses_within_window(
+        self, mock_state_manager, mock_sink
+    ):
+        """PresenceDetectionEventHandler should suppress events within the window."""
+        from sensors import Sensor, SensorType
+
+        sensor = Sensor(
+            device_id="sensor001", name="Living Room", sensor_type=SensorType.INDOOR
+        )
+        mock_state_manager.get_sensor.return_value = sensor
+        # Mock that we should NOT route (within window)
+        mock_state_manager.should_route_presence_event.return_value = False
+
+        mock_router = Mock()
+        mock_router.route_event = Mock()
+
+        handler = PresenceDetectionEventHandler(mock_router, mock_state_manager)
+
+        event = PresenceDetectionEvent(device="sensor001")
+        handler.handle_presence_event(event)
+
+        # Should NOT have routed the event
+        mock_router.route_event.assert_not_called()
+
+    def test_presence_handler_routes_after_window(self, mock_state_manager, mock_sink):
+        """PresenceDetectionEventHandler should route events after the window."""
+        from sensors import Sensor, SensorType
+
+        sensor = Sensor(
+            device_id="sensor001", name="Living Room", sensor_type=SensorType.INDOOR
+        )
+        mock_state_manager.get_sensor.return_value = sensor
+        # Mock that we should route (after window)
+        mock_state_manager.should_route_presence_event.return_value = True
+
+        mock_router = Mock()
+        mock_router.route_event = Mock()
+
+        handler = PresenceDetectionEventHandler(mock_router, mock_state_manager)
+
+        event = PresenceDetectionEvent(device="sensor001")
+        handler.handle_presence_event(event)
+
+        # Should have routed the event
+        mock_router.route_event.assert_called_once()
+        # Should have marked the event as routed
+        mock_state_manager.mark_presence_event_routed.assert_called_once()

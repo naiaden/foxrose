@@ -13,7 +13,6 @@ class CameraDetectionEventHandler:
 
     def handle_detection_event(self, event: CameraDetectionEvent):
         for user in [self.state.users.get_all_users()[0]]:
-
             user_mode = self.state.get_user_mode(user)
             priority = routing_rule(user_mode, event)
 
