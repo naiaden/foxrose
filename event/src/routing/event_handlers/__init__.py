@@ -9,6 +9,7 @@ from .camera_detection import CameraDetectionEventHandler
 from .device import DeviceEventHandler
 from .temperature import TemperatureEventHandler
 from .presence import PresenceDetectionEventHandler
+from .system import SystemEventHandler
 
 __all__ = [
     "AfvalEventHandler",
@@ -20,4 +21,5 @@ __all__ = [
     "DeviceEventHandler",
     "TemperatureEventHandler",
     "PresenceDetectionEventHandler",
+    "SystemEventHandler",
 ]

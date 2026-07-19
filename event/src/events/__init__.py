@@ -26,6 +26,12 @@ from events.device_event import (
     LowBatteryEvent,
     TemperatureEvent,
 )
+from events.system_event import (
+    SystemEvent,
+    HighCPUEvent,
+    HighSwapUsageEvent,
+    HighTmpUsageEvent,
+)
 
 __all__ = [
     "AfvalEvent",
@@ -48,4 +54,8 @@ __all__ = [
     "BatteryEvent",
     "LowBatteryEvent",
     "TemperatureEvent",
+    "SystemEvent",
+    "HighCPUEvent",
+    "HighSwapUsageEvent",
+    "HighTmpUsageEvent",
 ]

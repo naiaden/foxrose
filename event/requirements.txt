@@ -10,3 +10,4 @@ pyyaml
 ruff
 black
 pre-commit
+psutil

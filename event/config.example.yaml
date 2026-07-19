@@ -65,3 +65,10 @@ sensors:
 # Events from the same sensor within this window are suppressed
 # Default: 300 (5 minutes)
 # presence_window_seconds: 300
+
+# System monitoring configuration
+system_monitor:
+  cpu_threshold: 80.0
+  swap_threshold: 90.0
+  tmp_threshold: 90.0
+  check_interval: 60

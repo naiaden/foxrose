@@ -13,6 +13,9 @@ from events import (
     DoorCardEvent,
     BatteryEvent,
     TemperatureEvent,
+    HighCPUEvent,
+    HighSwapUsageEvent,
+    HighTmpUsageEvent,
 )
 
 
@@ -59,6 +62,7 @@ class MQTTMainDispatcher(MQTTDispatcher):
         client.subscribe("zigbee2mqtt/+")
         client.subscribe("foxrosehip/bot/users/+/cameras/+")
         client.subscribe("foxrosehip/afval")
+        client.subscribe("foxrosehip/system/#")
 
     def on_message_handler(self, client, userdata, msg):
         logger.debug(msg.topic + " " + str(msg.payload))
@@ -75,6 +79,8 @@ class MQTTMainDispatcher(MQTTDispatcher):
                 pass
             case "foxrosehip/afval":
                 self._handle_afval(msg)
+            case topic if topic.startswith("foxrosehip/system/"):
+                self._handle_system_event(msg)
 
     def _handle_afval(self, msg):
         logger.debug("Afval!")
@@ -110,6 +116,41 @@ class MQTTMainDispatcher(MQTTDispatcher):
 
         if payload.get("presence", None):
             self.router.route_event(PresenceDetectionEvent(device))
+
+    def _handle_system_event(self, msg):
+        """Handle system monitoring events from MQTT."""
+        parts = msg.topic.split("/")
+        event_type = parts[3] if len(parts) > 3 else None
+        payload = json.loads(msg.payload.decode())
+
+        hostname = payload.get("hostname", "unknown")
+
+        match event_type:
+            case "cpu":
+                self.router.route_event(
+                    HighCPUEvent(
+                        hostname=hostname,
+                        cpu_percentage=payload["cpu_percentage"],
+                        threshold=payload["threshold"],
+                    )
+                )
+            case "swap":
+                self.router.route_event(
+                    HighSwapUsageEvent(
+                        hostname=hostname,
+                        swap_percentage=payload["swap_percentage"],
+                        threshold=payload["threshold"],
+                    )
+                )
+            case "tmp":
+                self.router.route_event(
+                    HighTmpUsageEvent(
+                        hostname=hostname,
+                        tmp_percentage=payload["tmp_percentage"],
+                        threshold=payload["threshold"],
+                        path=payload.get("path", "/tmp"),
+                    )
+                )
 
 
 class MQTTFrigateDispatcher(MQTTDispatcher):

@@ -19,6 +19,7 @@ from routing.event_handlers import (
     ModeToggleEventHandler,
     UserSettingChangedEventHandler,
     TemperatureEventHandler,
+    SystemEventHandler,
 )
 from handlers.mqtt import MQTTMainDispatcher, MQTTFrigateDispatcher
 from state import StateManager
@@ -67,6 +68,7 @@ def main():
         ModeToggleEventHandler,
         UserSettingChangedEventHandler,
         TemperatureEventHandler,
+        SystemEventHandler,
     ):
         handler(router, state_manager)
 

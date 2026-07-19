@@ -6,6 +6,7 @@ from events import (
     PresenceDetectionEvent,
     IndoorPresenceDetectionEvent,
     OutdoorPresenceDetectionEvent,
+    PresenceWindowStartedEvent,
 )
 from sensors import SensorType
 from routing.rules import routing_rule, DeliveryType
@@ -33,6 +34,13 @@ class PresenceDetectionEventHandler:
                         f"Suppressing presence event for {sensor!s} (within {self.state._sensors.window_timeout}s window)"
                     )
                     return
+
+                # Check if this is a new window (after window expiration)
+                if self.state.is_new_presence_window(
+                    sensor.device_id, event._create_time
+                ):
+                    logger.info(f"New presence window started for {sensor!s}")
+                    self.router.route_event(PresenceWindowStartedEvent(device=sensor))
 
                 # Mark that we're routing this event
                 self.state.mark_presence_event_routed(

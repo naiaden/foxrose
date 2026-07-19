@@ -33,6 +33,14 @@ class NotificationConfig:
 
 
 @dataclass
+class SystemMonitorConfig:
+    cpu_threshold: float = 80.0
+    swap_threshold: float = 90.0
+    tmp_threshold: float = 90.0
+    check_interval: int = 60
+
+
+@dataclass
 class Config:
     mqtt: MQTTConfig
     servers: ServersConfig
@@ -44,6 +52,7 @@ class Config:
     thermometers: Dict[str, str]
     sensors: List[Sensor]
     presence_window_seconds: int = 300  # Default 5 minutes
+    system_monitor: SystemMonitorConfig = None
 
 
 def load_config(config_path: str = "config.yaml") -> Config:
@@ -114,6 +123,15 @@ def load_config(config_path: str = "config.yaml") -> Config:
     # Parse presence window timeout (default 300 seconds = 5 minutes)
     presence_window_seconds = data.get("presence_window_seconds", 300)
 
+    # Parse system monitor config
+    system_monitor_data = data.get("system_monitor", {})
+    system_monitor = SystemMonitorConfig(
+        cpu_threshold=system_monitor_data.get("cpu_threshold", 80.0),
+        swap_threshold=system_monitor_data.get("swap_threshold", 90.0),
+        tmp_threshold=system_monitor_data.get("tmp_threshold", 90.0),
+        check_interval=system_monitor_data.get("check_interval", 60),
+    )
+
     return Config(
         mqtt=mqtt,
         servers=servers,
@@ -125,4 +143,5 @@ def load_config(config_path: str = "config.yaml") -> Config:
         thermometers=thermometers,
         sensors=sensors,
         presence_window_seconds=presence_window_seconds,
+        system_monitor=system_monitor,
     )
