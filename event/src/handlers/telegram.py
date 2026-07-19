@@ -1,5 +1,4 @@
 import warnings
-import requests
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -22,6 +21,7 @@ from users import User
 from logging_config import logger
 import humanize
 import datetime
+from systems.nvr import FrigateNVR
 
 # Suppress InsecureRequestWarning for self-signed certificates
 from urllib3.exceptions import InsecureRequestWarning
@@ -34,6 +34,9 @@ class FoxRoseHandler:
         self.system = state_manager
         self.router = router
         self.config = config
+
+        # Initialize Frigate NVR interface
+        self.nvr = FrigateNVR(config.servers.frigate_server)
 
         self.application = Application.builder().token(bot_token).build()
         self.application.add_handler(CommandHandler("start", self.start))
@@ -129,21 +132,19 @@ class FoxRoseHandler:
         """Fetch and send a snapshot for a specific camera."""
         await update.message.reply_text(f"⏳ Fetching snapshot for {camera_name}...")
         try:
-            frigate_server = self.config.servers.frigate_server
-            url = f"https://{frigate_server}:8971/api/{camera_name.lower()}/latest.jpg"
-            response = requests.get(url, verify=False, timeout=10)
-            if response.status_code == 200:
+            image_bytes = self.nvr.get_snapshot(camera_name)
+            if image_bytes:
                 await context.bot.send_photo(
                     chat_id=update.effective_chat.id,
-                    photo=response.content,
+                    photo=image_bytes,
                 )
             else:
                 await update.message.reply_text(
-                    f"❌ Failed to fetch snapshot. Status: {response.status_code}"
+                    f"❌ Failed to fetch snapshot from {camera_name}"
                 )
         except Exception as e:
-            logger.error(f"Error fetching snapshot for {camera_name}: {e}")
-            await update.message.reply_text(f"❌ Error fetching snapshot: {e}")
+            logger.error(f"Error sending snapshot for {camera_name}: {e}")
+            await update.message.reply_text(f"❌ Error sending snapshot: {e}")
 
     async def _send_all_snapshots(
         self, update: Update, context: ContextTypes.DEFAULT_TYPE
