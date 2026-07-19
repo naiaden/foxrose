@@ -77,7 +77,7 @@ def main():
         state_manager=state_manager, router=router, address=config.mqtt.frigate_server
     ).connect()
 
-    bot = FoxRoseHandler(state_manager, router, telegram_token)
+    bot = FoxRoseHandler(state_manager, router, telegram_token, config)
     bot.run()
 
     logger.info("Initialization complete. Starting application block...")

@@ -13,6 +13,7 @@ class TestConfigLoader:
         """Should load a valid config file."""
         config_data = {
             "mqtt": {"main_server": "192.168.1.1", "frigate_server": "192.168.1.2"},
+            "servers": {"frigate_server": "192.168.1.2"},
             "doors": {},
             "notification": {"doorbell_topic": "test_topic", "bot_name": "test_bot"},
             "users": [],
@@ -36,6 +37,7 @@ class TestConfigLoader:
         """Should parse users correctly."""
         config_data = {
             "mqtt": {"main_server": "192.168.1.1", "frigate_server": "192.168.1.2"},
+            "servers": {"frigate_server": "192.168.1.2"},
             "doors": {},
             "notification": {"doorbell_topic": "test_topic", "bot_name": "test_bot"},
             "users": [
@@ -68,6 +70,7 @@ class TestConfigLoader:
         """Should parse sensors correctly."""
         config_data = {
             "mqtt": {"main_server": "192.168.1.1", "frigate_server": "192.168.1.2"},
+            "servers": {"frigate_server": "192.168.1.2"},
             "doors": {},
             "notification": {"doorbell_topic": "test_topic", "bot_name": "test_bot"},
             "users": [],

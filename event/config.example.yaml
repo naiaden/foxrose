@@ -6,6 +6,10 @@ mqtt:
   main_server: "192.168.0.1"
   frigate_server: "192.168.0.2"
 
+# Servers Configuration
+servers:
+  frigate_server: "192.168.0.2"
+
 # Door stations
 doors:
   achterdeur:

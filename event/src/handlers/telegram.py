@@ -1,3 +1,5 @@
+import warnings
+import requests
 from telegram import Update, ReplyKeyboardMarkup
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -21,11 +23,17 @@ from logging_config import logger
 import humanize
 import datetime
 
+# Suppress InsecureRequestWarning for self-signed certificates
+from urllib3.exceptions import InsecureRequestWarning
+
+warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+
 
 class FoxRoseHandler:
-    def __init__(self, state_manager, router, bot_token):
+    def __init__(self, state_manager, router, bot_token, config):
         self.system = state_manager
         self.router = router
+        self.config = config
 
         self.application = Application.builder().token(bot_token).build()
         self.application.add_handler(CommandHandler("start", self.start))
@@ -52,9 +60,8 @@ class FoxRoseHandler:
             notification_row.append(f"{status_emoji} Notif: {cam_label}")
         keyboard.append(notification_row)
 
-        # # 3. Rows for Snapshots
-        # snapshot_row = [f"📸 Snap: {cam.title()}" for cam in self.system._cameras]
-        # keyboard.append(snapshot_row)
+        # 3. Row for Snapshots
+        keyboard.append(["📸 All Snapshots", "📷 Select Camera"])
 
         # 4. Row for Snooze
         snooze_label = "⏰ Unsnooze" if user.is_snoozing else "💤 Snooze Notifications"
@@ -79,6 +86,49 @@ class FoxRoseHandler:
             resize_keyboard=True,
             one_time_keyboard=True,  # Automatically hides after they click one
         )
+
+    def build_snapshot_camera_keyboard(self) -> ReplyKeyboardMarkup:
+        """Build a keyboard with camera buttons for snapshot selection."""
+        keyboard = []
+        # Add each camera as a button
+        for cam in self.system._cameras:
+            keyboard.append([f"📸 Snap: {cam.title()}"])
+        # Add a back button
+        keyboard.append(["🔙 Back"])
+        return ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        )
+
+    async def _send_snapshot_for_camera(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE, camera_name: str
+    ):
+        """Fetch and send a snapshot for a specific camera."""
+        await update.message.reply_text(f"⏳ Fetching snapshot for {camera_name}...")
+        try:
+            frigate_server = self.config.servers.frigate_server
+            url = f"https://{frigate_server}:8971/api/{camera_name.lower()}/latest.jpg"
+            response = requests.get(url, verify=False, timeout=10)
+            if response.status_code == 200:
+                await context.bot.send_photo(
+                    chat_id=update.effective_chat.id,
+                    photo=response.content,
+                )
+            else:
+                await update.message.reply_text(
+                    f"❌ Failed to fetch snapshot. Status: {response.status_code}"
+                )
+        except Exception as e:
+            logger.error(f"Error fetching snapshot for {camera_name}: {e}")
+            await update.message.reply_text(f"❌ Error fetching snapshot: {e}")
+
+    async def _send_all_snapshots(
+        self, update: Update, context: ContextTypes.DEFAULT_TYPE
+    ):
+        """Fetch and send snapshots for all cameras."""
+        for cam in self.system._cameras:
+            await self._send_snapshot_for_camera(update, context, cam.title())
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.debug(
@@ -181,12 +231,27 @@ class FoxRoseHandler:
             return
 
         # --- HANDLE SNAPSHOTS ---
+        elif text == "📸 All Snapshots":
+            await self._send_all_snapshots(update, context)
+            return
+
+        elif text == "📷 Select Camera":
+            await update.message.reply_text(
+                "Select a camera to get a snapshot from:",
+                reply_markup=self.build_snapshot_camera_keyboard(),
+            )
+            return
+
         elif "Snap:" in text:
             cam_title = text.split("Snap: ")[1]
+            await self._send_snapshot_for_camera(update, context, cam_title)
+            return
 
-            await update.message.reply_text(f"⏳ Fetching snapshot for {cam_title}...")
-            # TODO: Grab your image from Frigate API and send it:
-            # await context.bot.send_photo(chat_id=user_id, photo=open('snap.jpg', 'rb'))
+        elif text == "🔙 Back":
+            await update.message.reply_text(
+                "Back to main menu.",
+                reply_markup=self.build_persistent_keyboard(user),
+            )
             return
 
         elif text == "💤 Snooze Notifications":

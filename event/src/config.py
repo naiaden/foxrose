@@ -22,6 +22,11 @@ class MQTTConfig:
 
 
 @dataclass
+class ServersConfig:
+    frigate_server: str
+
+
+@dataclass
 class NotificationConfig:
     doorbell_topic: str
     bot_name: str
@@ -30,6 +35,7 @@ class NotificationConfig:
 @dataclass
 class Config:
     mqtt: MQTTConfig
+    servers: ServersConfig
     doors: Dict[str, DoorConfig]
     notification: NotificationConfig
     users: List[User]
@@ -51,6 +57,11 @@ def load_config(config_path: str = "config.yaml") -> Config:
     mqtt = MQTTConfig(
         main_server=data["mqtt"]["main_server"],
         frigate_server=data["mqtt"]["frigate_server"],
+    )
+
+    # Parse servers config
+    servers = ServersConfig(
+        frigate_server=data["servers"]["frigate_server"],
     )
 
     # Parse door configs
@@ -105,6 +116,7 @@ def load_config(config_path: str = "config.yaml") -> Config:
 
     return Config(
         mqtt=mqtt,
+        servers=servers,
         doors=doors,
         notification=notification,
         users=users,
