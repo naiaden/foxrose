@@ -12,6 +12,7 @@ This system provides intelligent notification routing for home security and auto
 - **Temperature Monitoring**: Tracks temperature trends from sensors
 - **Battery Monitoring**: Alerts on low battery devices
 - **Afval (Waste) Collection**: Sends waste collection reminders
+- **System Monitoring**: Monitors host system resources (CPU, swap, disk) and alerts on threshold breaches
 
 The system supports multiple user modes (At Home, Away, Night, Standard) to control notification behavior based on context.
 
@@ -38,6 +39,7 @@ The system supports multiple user modes (At Home, Away, Night, Standard) to cont
 - **Router** (`src/routing/`): Event routing with mode-based delivery rules
 - **Sinks** (`src/sinks/`): Notification delivery (Telegram, Console)
 - **State** (`src/state.py`): User management, mode tracking, sensor state
+- **System Monitor** (`system_monitor.py`): Standalone daemon that monitors host resources and publishes to MQTT
 
 ## Setup
 
@@ -123,6 +125,13 @@ frigate_cameras:
 thermometers:
   "0x_sensor_id_1": "Living Room"
   "0x_sensor_id_2": "Bedroom"
+
+# System monitoring configuration
+system_monitor:
+  cpu_threshold: 80.0      # CPU usage alert threshold (%)
+  swap_threshold: 90.0     # Swap usage alert threshold (%)
+  tmp_threshold: 90.0      # /tmp disk usage alert threshold (%)
+  check_interval: 60       # Check interval in seconds
 ```
 
 ### .env (Secrets only)
@@ -135,6 +144,11 @@ Only secrets are stored in `.env`:
 | `LOG_LEVEL` | Logging level (DEBUG, INFO, etc.) |
 | `LOG_FILE` | Log file path |
 | `CONFIG_PATH` | Custom config file path (optional) |
+| `SYSTEM_MONITOR_CPU_THRESHOLD` | CPU usage threshold (default: 80.0) |
+| `SYSTEM_MONITOR_SWAP_THRESHOLD` | Swap usage threshold (default: 90.0) |
+| `SYSTEM_MONITOR_TMP_THRESHOLD` | /tmp usage threshold (default: 90.0) |
+| `SYSTEM_MONITOR_CHECK_INTERVAL` | Check interval in seconds (default: 60) |
+| `SYSTEM_MONITOR_MQTT_SERVER` | MQTT broker address (default: localhost) |
 
 ### Creating Configuration
 
@@ -169,6 +183,49 @@ Or with Docker:
 docker-compose up -d
 ```
 
+### Running the System Monitor
+
+The system monitor is a separate daemon that monitors host resources and publishes alerts to MQTT:
+
+```bash
+python system_monitor.py
+```
+
+Or with custom settings:
+```bash
+python system_monitor.py --cpu-threshold 85 --swap-threshold 95 --check-interval 30
+```
+
+Or via environment variables:
+```bash
+SYSTEM_MONITOR_CPU_THRESHOLD=85 SYSTEM_MONITOR_MQTT_SERVER=192.168.1.100 python system_monitor.py
+```
+
+**Systemd Service Example:**
+
+Create `/etc/systemd/system/foxrose-monitor.service`:
+```ini
+[Unit]
+Description=FoxRose System Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=your_user
+WorkingDirectory=/path/to/foxrose/event
+ExecStart=/usr/bin/python3 system_monitor.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then:
+```bash
+sudo systemctl enable --now foxrose-monitor.service
+```
+
 ### Telegram Bot Commands
 
 Users can interact with the bot via Telegram:
@@ -191,10 +248,18 @@ The bot provides a persistent keyboard with:
 2. **Camera Notification Toggles**:
    - 🔔/🔕 Notif: `<camera>` - Toggle notifications per camera
 
-3. **Snooze**:
-   - 💤 Snooze Notifications - Temporarily disable notifications
+3. **Snapshots**:
+   - 📸 All Snapshots - Fetch and send snapshots from all cameras
+   - 📷 Select Camera - Choose a specific camera for snapshot
+
+4. **Snooze**:
+   - 💤 Snooze All - Temporarily disable all notifications
    - ⏳ 15 Mins, 1 Hour, 3 Hours, 8 Hours - Snooze duration options
    - ⏰ Unsnooze - Cancel snooze early
+   - 🎯 Snooze Specific - Toggle snooze for specific event types:
+     - Indoor Presence
+     - Outdoor Presence
+     - Camera Detection
 
 ### MQTT Topics
 
@@ -206,6 +271,9 @@ The system subscribes to:
 - `zigbee2mqtt/+` - Zigbee sensor data (battery, temperature, presence)
 - `foxrosehip/bot/users/+/cameras/+` - User camera preference updates
 - `foxrosehip/afval` - Waste collection notifications
+- `foxrosehip/system/{hostname}/cpu` - High CPU usage alerts
+- `foxrosehip/system/{hostname}/swap` - High swap usage alerts
+- `foxrosehip/system/{hostname}/tmp` - High /tmp disk usage alerts
 
 **Frigate MQTT:**
 - `frigate/+/+/snapshot` - Camera snapshots
@@ -223,32 +291,34 @@ pytest
 
 ```
 src/
-├── main.py              # Application entry point
-├── state.py             # State manager (users, sensors, modes)
-├── users.py             # User and UserManager classes
-├── sensors.py           # Sensor and SensorSystem classes
-├── modes.py             # Mode enum (AT_HOME, AWAY, NIGHT, STANDARD)
-├── temperatures.py      # Temperature tracking and trends
-├── logging_config.py    # Loguru configuration
-├── config.py            # YAML configuration loader
-├── api.py               # Legacy API entry point
+├── main.py                 # Application entry point
+├── state.py                # State manager (users, sensors, modes)
+├── users.py                # User and UserManager classes
+├── sensors.py              # Sensor and SensorSystem classes
+├── modes.py                # Mode enum (AT_HOME, AWAY, NIGHT, STANDARD)
+├── temperatures.py         # Temperature tracking and trends
+├── logging_config.py       # Loguru configuration
+├── config.py               # YAML configuration loader
+├── api.py                  # Legacy API entry point
 │
-├── events/              # Event definitions
-│   ├── event.py         # Base Event class
-│   ├── afval_event.py   # Waste collection events
-│   ├── change_event.py  # User settings change events
-│   ├── detection_event.py # Camera/presence detection events
-│   ├── device_event.py  # Battery/temperature device events
-│   └── doorcard_event.py # Door access events
+├── events/                 # Event definitions
+│   ├── __init__.py
+│   ├── event.py            # Base Event class
+│   ├── afval_event.py      # Waste collection events
+│   ├── change_event.py     # User settings change events
+│   ├── detection_event.py  # Camera/presence detection events
+│   ├── device_event.py     # Battery/temperature device events
+│   ├── doorcard_event.py   # Door access events
+│   └── system_event.py     # System monitoring events (CPU, swap, disk)
 │
-├── handlers/            # Event handlers
-│   ├── mqtt.py          # MQTT dispatchers
-│   └── telegram.py      # Telegram bot handler
+├── handlers/               # Event handlers
+│   ├── mqtt.py             # MQTT dispatchers
+│   └── telegram.py         # Telegram bot handler
 │
-├── routing/             # Event routing
-│   ├── router.py        # NotificationRouter
-│   ├── rules.py         # Mode-based delivery rules
-│   └── event_handlers/  # Individual event handler classes
+├── routing/                # Event routing
+│   ├── router.py           # NotificationRouter
+│   ├── rules.py            # Mode-based delivery rules
+│   └── event_handlers/     # Individual event handler classes
 │       ├── __init__.py
 │       ├── afval.py
 │       ├── user_settings.py
@@ -258,18 +328,85 @@ src/
 │       ├── camera_detection.py
 │       ├── device.py
 │       ├── temperature.py
-│       └── presence.py
+│       ├── presence.py
+│       └── system.py       # System event handler
 │
-├── sinks/               # Notification delivery
-│   ├── base.py          # Abstract NotificationSink
-│   ├── telegram.py      # Telegram message delivery
-│   └── console.py       # Console logging sink
+├── sinks/                  # Notification delivery
+│   ├── base.py             # Abstract NotificationSink
+│   ├── telegram.py         # Telegram message delivery
+│   └── console.py          # Console logging sink
 │
-└── systems/             # System integrations
-    ├── notification.py  # Notification system
-    ├── camera.py        # Camera system
-    └── dahua.py         # Dahua door station integration
+└── systems/                # System integrations
+    ├── notification.py     # Notification system
+    ├── camera.py           # Camera system
+    └── dahua.py            # Dahua door station integration
+
+system_monitor.py           # Standalone system resource monitoring daemon
 ```
+
+## Snooze Functionality
+
+The snooze feature allows users to temporarily disable notifications:
+
+### Snooze All Notifications
+
+- Tap **💤 Snooze All** to snooze all notifications
+- Select a duration: **⏳ 15 Mins**, **⏳ 1 Hour**, **⏳ 3 Hours**, or **⏳ 8 Hours**
+- Tap **⏰ Unsnooze** to cancel snooze early
+- During snooze, all notifications are suppressed except critical system alerts
+
+### Snooze Specific Event Types
+
+- Tap **🎯 Snooze Specific** to toggle snooze for individual event types:
+  - Indoor Presence
+  - Outdoor Presence
+  - Camera Detection
+- Each type can be toggled independently (🔔/🔕)
+- This allows fine-grained control over which notifications to receive
+
+## Snapshots
+
+The snapshot feature allows users to request camera snapshots on demand:
+
+### All Snapshots
+
+- Tap **📸 All Snapshots** to fetch and send snapshots from all configured cameras
+- Snapshots are retrieved from the Frigate NVR
+- Images are sent directly to the Telegram chat
+
+### Select Camera
+
+- Tap **📷 Select Camera** to choose a specific camera
+- A keyboard with all available cameras will appear
+- Tap a camera button (e.g., **📸 Snap: Achterdeur**) to get a snapshot
+- The snapshot is fetched from Frigate and sent to the chat
+
+## System Monitoring
+
+The system monitor (`system_monitor.py`) is a standalone daemon that:
+
+- Monitors CPU, swap, and /tmp disk usage
+- Publishes alerts to MQTT when thresholds are exceeded
+- Includes hostname in MQTT topics for multi-host deployments
+- Configurable thresholds and check intervals
+
+### MQTT Payload Format
+
+```json
+{
+  "hostname": "foxrose-server",
+  "cpu_percentage": 85.5,
+  "threshold": 80.0
+}
+```
+
+### Event Types
+
+- **HighCPUEvent**: CPU usage exceeded threshold
+- **HighSwapUsageEvent**: Swap usage exceeded threshold
+- **HighTmpUsageEvent**: /tmp disk usage exceeded threshold
+
+All system events include the hostname for identification in multi-host environments.
 
 ## License
 
