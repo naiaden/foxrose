@@ -64,8 +64,8 @@ class FoxRoseHandler:
         keyboard.append(["📸 All Snapshots", "📷 Select Camera"])
 
         # 4. Row for Snooze
-        snooze_label = "⏰ Unsnooze" if user.is_snoozing else "💤 Snooze Notifications"
-        keyboard.append([snooze_label])
+        snooze_label = "⏰ Unsnooze" if user.is_snoozing else "💤 Snooze All"
+        keyboard.append([snooze_label, "🎯 Snooze Specific"])
 
         # Return ReplyKeyboardMarkup instead of Inline
         return ReplyKeyboardMarkup(
@@ -85,6 +85,28 @@ class FoxRoseHandler:
             keyboard,
             resize_keyboard=True,
             one_time_keyboard=True,  # Automatically hides after they click one
+        )
+
+    def build_snooze_specific_keyboard(self, user: User) -> ReplyKeyboardMarkup:
+        """Build a keyboard with specific event type snooze toggles."""
+        keyboard = []
+        # Indoor presence toggle
+        indoor_status = "🔕" if user.is_event_type_snoozed("indoor_presence") else "🔔"
+        keyboard.append([f"{indoor_status} Indoor Presence"])
+        # Outdoor presence toggle
+        outdoor_status = (
+            "🔕" if user.is_event_type_snoozed("outdoor_presence") else "🔔"
+        )
+        keyboard.append([f"{outdoor_status} Outdoor Presence"])
+        # Camera detection toggle
+        camera_status = "🔕" if user.is_event_type_snoozed("camera") else "🔔"
+        keyboard.append([f"{camera_status} Camera Detection"])
+        # Add a back button
+        keyboard.append(["🔙 Back"])
+        return ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True,
+            one_time_keyboard=True,
         )
 
     def build_snapshot_camera_keyboard(self) -> ReplyKeyboardMarkup:
@@ -254,10 +276,49 @@ class FoxRoseHandler:
             )
             return
 
-        elif text == "💤 Snooze Notifications":
+        elif text == "💤 Snooze All":
             await update.message.reply_text(
-                "How long would you like to snooze notifications for?",
+                "How long would you like to snooze all notifications for?",
                 reply_markup=self.build_snooze_duration_keyboard(),
+            )
+            return
+
+        elif text == "🎯 Snooze Specific":
+            await update.message.reply_text(
+                "Select which notification type to snooze:",
+                reply_markup=self.build_snooze_specific_keyboard(user),
+            )
+            return
+
+        # --- HANDLE SPECIFIC SNOOZE TOGGLES ---
+        elif (
+            "Indoor Presence" in text
+            or "Outdoor Presence" in text
+            or "Camera Detection" in text
+        ):
+            # Extract event type from button text
+            if "Indoor Presence" in text:
+                event_type = "indoor_presence"
+            elif "Outdoor Presence" in text:
+                event_type = "outdoor_presence"
+            else:
+                event_type = "camera"
+
+            # Toggle the snooze state
+            new_state = not user.is_event_type_snoozed(event_type)
+            self.router.route_event(
+                UserSettingsChangedEvent(
+                    user=user,
+                    settings_type=UserSettingsType.SNOOZE_SPECIFIC,
+                    settings_value=event_type,
+                    value=new_state,
+                )
+            )
+
+            # Update the keyboard
+            await update.message.reply_text(
+                f"Toggled {event_type} snooze to {new_state}.",
+                reply_markup=self.build_snooze_specific_keyboard(user),
             )
             return
 

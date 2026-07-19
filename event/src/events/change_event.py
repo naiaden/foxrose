@@ -30,6 +30,7 @@ class UserSettingsType(Enum):
     CAMERA_PREFERENCE = auto()
     MODE = auto()
     SNOOZE = auto()
+    SNOOZE_SPECIFIC = auto()
 
 
 @dataclass(frozen=True)

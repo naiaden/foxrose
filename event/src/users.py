@@ -2,7 +2,12 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Set, Optional
 from modes import Mode
 from events.event import Event
-from events.detection_event import CameraDetectionEvent, PresenceDetectionEvent
+from events.detection_event import (
+    CameraDetectionEvent,
+    PresenceDetectionEvent,
+    IndoorPresenceDetectionEvent,
+    OutdoorPresenceDetectionEvent,
+)
 
 from logging_config import logger
 
@@ -20,12 +25,25 @@ class User:
         self._keycards: Set[str] = keycards or set()
 
         self._snooze_time: datetime = None
+        self._snoozed_event_types: Set[str] = set()
         self._mode = Mode.AT_HOME
 
     def __str__(self) -> str:
         return "[" + self.name + "]"
 
     def wants_notification(self, event: Event) -> bool:
+        # Check for specific snoozed event types
+        if isinstance(event, IndoorPresenceDetectionEvent):
+            if "indoor_presence" in self._snoozed_event_types:
+                return False
+        elif isinstance(event, OutdoorPresenceDetectionEvent):
+            if "outdoor_presence" in self._snoozed_event_types:
+                return False
+        elif isinstance(event, CameraDetectionEvent):
+            if "camera" in self._snoozed_event_types:
+                return False
+
+        # Check for general snooze
         if self.is_snoozing:
             return False
 
@@ -36,6 +54,22 @@ class User:
             return self.has_camera_interest(event.camera_name)
 
         return True
+
+    def is_event_type_snoozed(self, event_type: str) -> bool:
+        """Check if a specific event type is snoozed."""
+        return event_type in self._snoozed_event_types
+
+    def set_event_type_snoozed(self, event_type: str, value: bool = True) -> None:
+        """Set or unset snooze for a specific event type."""
+        if value:
+            self._snoozed_event_types.add(event_type)
+        else:
+            self._snoozed_event_types.discard(event_type)
+
+    def reset_all_snoozes(self) -> None:
+        """Reset both general and specific snoozes."""
+        self._snooze_time = None
+        self._snoozed_event_types = set()
 
     @property
     def mode(self) -> Mode:

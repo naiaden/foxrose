@@ -1,6 +1,6 @@
 """Handler for snooze events."""
 
-from events import UserSnoozeEvent
+from events import UserSnoozeEvent, UserSettingsChangedEvent, UserSettingsType
 
 
 class SnoozeEventHandler:
@@ -9,6 +9,9 @@ class SnoozeEventHandler:
         self.state = state_manager
 
         self.router.subscribe(UserSnoozeEvent, self.handle_snooze_event)
+        self.router.subscribe(
+            UserSettingsChangedEvent, self.handle_specific_snooze_event
+        )
 
     def handle_snooze_event(self, event: UserSnoozeEvent):
         if event.value is None:
@@ -33,4 +36,10 @@ class SnoozeEventHandler:
 
         if isinstance(event.value, (int, float)):
             event.user.snooze_for(event.value)
+            return
+
+    def handle_specific_snooze_event(self, event: UserSettingsChangedEvent):
+        """Handle specific event type snoozes."""
+        if event.settings_type == UserSettingsType.SNOOZE_SPECIFIC:
+            event.user.set_event_type_snoozed(event.settings_value, event.value)
             return
