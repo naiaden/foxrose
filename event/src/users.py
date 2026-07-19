@@ -28,6 +28,10 @@ class User:
         self._snoozed_event_types: Set[str] = set()
         self._mode = Mode.AT_HOME
 
+        # Snooze tracking for state display
+        self._snooze_count: int = 0
+        self._last_snooze_time: datetime = None
+
     def __str__(self) -> str:
         return "[" + self.name + "]"
 
@@ -96,6 +100,12 @@ class User:
 
     def snooze_for(self, duration: int | float) -> None:
         self.snooze_until(datetime.now() + timedelta(seconds=duration))
+        self._snooze_count += 1
+        self._last_snooze_time = datetime.now()
+
+    def reset_snooze_count(self) -> None:
+        """Reset the snooze counter (called after state is displayed)."""
+        self._snooze_count = 0
 
     def has_camera_interest(self, camera_name: str) -> bool:
         return self._camera_preferences.get(camera_name, False)

@@ -196,6 +196,24 @@ class FoxRoseHandler:
         ]
         temp_text1 = "\n".join(y)
 
+        # Build snooze info
+        snooze_info = ""
+        if user._snooze_count > 0 or user.is_snoozing:
+            snooze_parts = []
+            if user.is_snoozing:
+                snooze_parts.append(
+                    f"⏰ Currently snoozing until {user._snooze_time.strftime('%H:%M')}"
+                )
+            if user._snooze_count > 0:
+                snooze_parts.append(
+                    f"💤 Snoozed {user._snooze_count} time(s) since last check"
+                )
+                if user._last_snooze_time:
+                    snooze_parts.append(
+                        f"Last snooze: {user._last_snooze_time.strftime('%H:%M')}"
+                    )
+            snooze_info = "\n\n".join(snooze_parts)
+
         text = (
             f"🤖 *System Status for `{user!s}`*\n"
             f"🏡 Mode: `{user.mode}`\n\n"
@@ -206,6 +224,13 @@ class FoxRoseHandler:
             f"🌡️ *Presence:*\n"
             f"`{temp_text1}`"
         )
+
+        if snooze_info:
+            text += f"\n\n{snooze_info}"
+
+        # Reset snooze counter after displaying state
+        user.reset_snooze_count()
+
         # logger.info(text)
         await update.message.reply_text(text, parse_mode=ParseMode.MARKDOWN_V2)
 
