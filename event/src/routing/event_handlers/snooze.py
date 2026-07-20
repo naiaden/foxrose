@@ -43,3 +43,7 @@ class SnoozeEventHandler:
         if event.settings_type == UserSettingsType.SNOOZE_SPECIFIC:
             event.user.set_event_type_snoozed(event.settings_value, event.value)
             return
+
+        if event.settings_type == UserSettingsType.SNOOZE_SENSOR:
+            event.user.set_sensor_snoozed(event.settings_value, event.value)
+            return

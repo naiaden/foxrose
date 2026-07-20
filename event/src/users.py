@@ -26,6 +26,7 @@ class User:
 
         self._snooze_time: datetime = None
         self._snoozed_event_types: Set[str] = set()
+        self._snoozed_sensors: Set[str] = set()
         self._mode = Mode.AT_HOME
 
         # Snooze tracking for state display
@@ -36,11 +37,15 @@ class User:
         return "[" + self.name + "]"
 
     def wants_notification(self, event: Event) -> bool:
-        # Check for specific snoozed event types
+        # Check for specific snoozed sensors
         if isinstance(event, IndoorPresenceDetectionEvent):
+            if event.device.device_id in self._snoozed_sensors:
+                return False
             if "indoor_presence" in self._snoozed_event_types:
                 return False
         elif isinstance(event, OutdoorPresenceDetectionEvent):
+            if event.device.device_id in self._snoozed_sensors:
+                return False
             if "outdoor_presence" in self._snoozed_event_types:
                 return False
         elif isinstance(event, CameraDetectionEvent):
@@ -70,10 +75,22 @@ class User:
         else:
             self._snoozed_event_types.discard(event_type)
 
+    def is_sensor_snoozed(self, device_id: str) -> bool:
+        """Check if a specific sensor is snoozed."""
+        return device_id in self._snoozed_sensors
+
+    def set_sensor_snoozed(self, device_id: str, value: bool = True) -> None:
+        """Set or unset snooze for a specific sensor."""
+        if value:
+            self._snoozed_sensors.add(device_id)
+        else:
+            self._snoozed_sensors.discard(device_id)
+
     def reset_all_snoozes(self) -> None:
         """Reset both general and specific snoozes."""
         self._snooze_time = None
         self._snoozed_event_types = set()
+        self._snoozed_sensors = set()
 
     @property
     def mode(self) -> Mode:

@@ -112,6 +112,41 @@ class FoxRoseHandler:
             one_time_keyboard=True,
         )
 
+    def build_sensor_snooze_keyboard(
+        self, event_type: str, user: User
+    ) -> ReplyKeyboardMarkup:
+        """Build a keyboard with sensors for snoozing based on event type."""
+        keyboard = []
+
+        if event_type == "indoor_presence":
+            # Add "All Indoor Sensors" button
+            keyboard.append(["🔇 All Indoor Sensors"])
+            # Add individual indoor sensors
+            for sensor in self.system._sensors.sensors:
+                if sensor.sensor_type.name == "INDOOR":
+                    status = "🔕" if user.is_sensor_snoozed(sensor.device_id) else "🔔"
+                    keyboard.append(
+                        [f"{status} Sensor: {sensor.device_id} {sensor.name}"]
+                    )
+        elif event_type == "outdoor_presence":
+            # Add "All Outdoor Sensors" button
+            keyboard.append(["🔇 All Outdoor Sensors"])
+            # Add individual outdoor sensors
+            for sensor in self.system._sensors.sensors:
+                if sensor.sensor_type.name == "OUTDOOR":
+                    status = "🔕" if user.is_sensor_snoozed(sensor.device_id) else "🔔"
+                    keyboard.append(
+                        [f"{status} Sensor: {sensor.device_id} {sensor.name}"]
+                    )
+
+        # Add a back button
+        keyboard.append(["🔙 Back"])
+        return ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        )
+
     def build_snapshot_camera_keyboard(self) -> ReplyKeyboardMarkup:
         """Build a keyboard with camera buttons for snapshot selection."""
         keyboard = []
@@ -309,6 +344,7 @@ class FoxRoseHandler:
             )
             return
 
+        # --- HANDLE SNOOZE TYPE SELECTION ---
         elif text == "🎯 Snooze Specific":
             await update.message.reply_text(
                 "Select which notification type to snooze:",
@@ -316,21 +352,45 @@ class FoxRoseHandler:
             )
             return
 
-        # --- HANDLE SPECIFIC SNOOZE TOGGLES ---
-        elif (
-            "Indoor Presence" in text
-            or "Outdoor Presence" in text
-            or "Camera Detection" in text
-        ):
+        # --- HANDLE EVENT TYPE SELECTION (show sensor list) ---
+        elif "Indoor Presence" in text or "Outdoor Presence" in text:
             # Extract event type from button text
             if "Indoor Presence" in text:
                 event_type = "indoor_presence"
-            elif "Outdoor Presence" in text:
-                event_type = "outdoor_presence"
             else:
-                event_type = "camera"
+                event_type = "outdoor_presence"
 
-            # Toggle the snooze state
+            # Show sensor selection keyboard for this event type
+            await update.message.reply_text(
+                f"Select sensors to snooze for {event_type.replace('_', ' ').title()}:",
+                reply_markup=self.build_sensor_snooze_keyboard(event_type, user),
+            )
+            return
+
+        elif "Camera Detection" in text:
+            # Camera detection doesn't have individual sensors, just toggle the event type
+            event_type = "camera"
+            new_state = not user.is_event_type_snoozed(event_type)
+            self.router.route_event(
+                UserSettingsChangedEvent(
+                    user=user,
+                    settings_type=UserSettingsType.SNOOZE_SPECIFIC,
+                    settings_value=event_type,
+                    value=new_state,
+                )
+            )
+            await update.message.reply_text(
+                f"Toggled {event_type} snooze to {new_state}.",
+                reply_markup=self.build_snooze_specific_keyboard(user),
+            )
+            return
+
+        # --- HANDLE SENSOR SNOOZE ACTIONS ---
+        elif "All Indoor Sensors" in text or "All Outdoor Sensors" in text:
+            # Determine event type from button text
+            event_type = "indoor_presence" if "Indoor" in text else "outdoor_presence"
+
+            # Toggle all sensors of this type
             new_state = not user.is_event_type_snoozed(event_type)
             self.router.route_event(
                 UserSettingsChangedEvent(
@@ -341,10 +401,40 @@ class FoxRoseHandler:
                 )
             )
 
+            await update.message.reply_text(
+                f"Toggled all {event_type.replace('_', ' ')} sensors to {new_state}.",
+                reply_markup=self.build_snooze_specific_keyboard(user),
+            )
+            return
+
+        elif "Sensor:" in text:
+            # Extract sensor device_id from button text (e.g., "🔔 Sensor: 001 Living Room" -> "001")
+            parts = text.split("Sensor: ")[1].split(" ", 1)
+            device_id = parts[0]
+
+            # Toggle the sensor snooze state
+            new_state = not user.is_sensor_snoozed(device_id)
+            self.router.route_event(
+                UserSettingsChangedEvent(
+                    user=user,
+                    settings_type=UserSettingsType.SNOOZE_SENSOR,
+                    settings_value=device_id,
+                    value=new_state,
+                )
+            )
+
+            # Determine event type based on sensor type to show correct keyboard
+            sensor = self.system.get_sensor(device_id)
+            event_type = (
+                "indoor_presence"
+                if sensor.sensor_type.name == "INDOOR"
+                else "outdoor_presence"
+            )
+
             # Update the keyboard
             await update.message.reply_text(
-                f"Toggled {event_type} snooze to {new_state}.",
-                reply_markup=self.build_snooze_specific_keyboard(user),
+                f"Toggled sensor {device_id} ({sensor.name}) snooze to {new_state}.",
+                reply_markup=self.build_sensor_snooze_keyboard(event_type, user),
             )
             return
 

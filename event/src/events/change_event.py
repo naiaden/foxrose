@@ -31,6 +31,7 @@ class UserSettingsType(Enum):
     MODE = auto()
     SNOOZE = auto()
     SNOOZE_SPECIFIC = auto()
+    SNOOZE_SENSOR = auto()
 
 
 @dataclass(frozen=True)
