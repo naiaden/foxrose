@@ -55,13 +55,12 @@ class FoxRoseHandler:
         # 1. Row for Modes
         keyboard.append([mode.label for mode in Mode])
 
-        # 2. Rows for Detection Notifications (Dynamic Toggles)
-        notification_row = []
-        for cam in self.system._cameras:
-            status_emoji = "🔔" if user.has_camera_interest(cam) else "🔕"
-            cam_label = cam.title()
-            notification_row.append(f"{status_emoji} Notif: {cam_label}")
-        keyboard.append(notification_row)
+        # 2. Row for Camera Notifications (Master Toggle + Select Specific)
+        all_enabled = all(user.has_camera_interest(cam) for cam in self.system._cameras)
+        camera_status = "🔕" if all_enabled else "🔔"
+        keyboard.append(
+            [f"{camera_status} All Camera Notifications", "📹 Select Cameras"]
+        )
 
         # 3. Row for Snapshots
         keyboard.append(["📸 All Snapshots", "📷 Select Camera"])
@@ -153,6 +152,21 @@ class FoxRoseHandler:
         # Add each camera as a button
         for cam in self.system._cameras:
             keyboard.append([f"📸 Snap: {cam.title()}"])
+        # Add a back button
+        keyboard.append(["🔙 Back"])
+        return ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True,
+            one_time_keyboard=True,
+        )
+
+    def build_camera_notification_keyboard(self, user: User) -> ReplyKeyboardMarkup:
+        """Build a keyboard with camera buttons for notification toggles."""
+        keyboard = []
+        # Add each camera as a button with current status
+        for cam in self.system._cameras:
+            status_emoji = "🔕" if user.has_camera_interest(cam) else "🔔"
+            keyboard.append([f"{status_emoji} Notif: {cam.title()}"])
         # Add a back button
         keyboard.append(["🔙 Back"])
         return ReplyKeyboardMarkup(
@@ -288,7 +302,41 @@ class FoxRoseHandler:
             await update.message.reply_text(f"✅ Mode changed to: {mode.display_name}")
             return
 
-        # --- HANDLE NOTIFICATION TOGGLES ---
+        # --- HANDLE CAMERA NOTIFICATION MASTER TOGGLE ---
+        elif "All Camera Notifications" in text:
+            # Toggle all cameras to the opposite of current state
+            all_enabled = all(
+                user.has_camera_interest(cam) for cam in self.system._cameras
+            )
+            new_state = not all_enabled
+
+            # Set all cameras to the new state
+            for cam in self.system._cameras:
+                self.router.route_event(
+                    UserSettingsChangedEvent(
+                        user=user,
+                        settings_type=UserSettingsType.CAMERA_PREFERENCE,
+                        settings_value=cam,
+                        value=new_state,
+                    )
+                )
+
+            state_text = "enabled" if new_state else "disabled"
+            await update.message.reply_text(
+                f"✅ All camera notifications {state_text}.",
+                reply_markup=self.build_persistent_keyboard(user),
+            )
+            return
+
+        # --- HANDLE SELECT CAMERAS BUTTON ---
+        elif text == "📹 Select Cameras":
+            await update.message.reply_text(
+                "Select cameras to configure notifications:",
+                reply_markup=self.build_camera_notification_keyboard(user),
+            )
+            return
+
+        # --- HANDLE INDIVIDUAL CAMERA NOTIFICATION TOGGLES ---
         elif "Notif:" in text:
             # Extract camera name from string (e.g., "🔔 Notif: Achterdeur" -> "achterdeur")
             cam_title = text.split("Notif: ")[1]
@@ -309,7 +357,7 @@ class FoxRoseHandler:
             # Update the user interface keyboard immediately with the new emoji
             await update.message.reply_text(
                 f"Updated notification settings for {cam_title} to {new_state}.",
-                reply_markup=self.build_persistent_keyboard(user),
+                reply_markup=self.build_camera_notification_keyboard(user),
             )
             return
 
