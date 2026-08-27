@@ -9,5 +9,5 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 COPY ./src /code/app
 COPY ./config.example.yaml /code/config.example.yaml
 
-CMD ["python", "app/api.py"]
+CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
 

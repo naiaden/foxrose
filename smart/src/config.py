@@ -2,6 +2,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+from dotenv import load_dotenv
+
+# Load environment variables from a `.env` file in the project directory. This
+# makes the app work regardless of how it is started (`fastapi dev`, `uvicorn`,
+# docker, ...) — neither `fastapi` CLI nor uvicorn loads `.env` automatically
+# for the app process. Explicitly set environment variables (e.g. from docker
+# compose) always take precedence because `load_dotenv()` does not override them.
+load_dotenv()
 
 
 @dataclass

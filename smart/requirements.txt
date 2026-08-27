@@ -1,5 +1,6 @@
 fastapi[standard]
 python-hue-v2
+python-dotenv
 pyyaml
 pytest
 pytest-cov

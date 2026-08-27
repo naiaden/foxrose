@@ -37,6 +37,9 @@ class MockScene:
         self.name = name
         self.activated = False
 
+    def __str__(self):
+        return self.name
+
     def activate(self):
         self.activated = True
 
@@ -140,8 +143,13 @@ def create_test_client(mock_home, config=None):
     if config is None:
         config = SmartConfig()
 
-    # Reset any module-level state before each test so tests are fully isolated.
+    # Reset any module-level state before each test so tests are fully
+    # isolated. Resetting the home also resets `RoomId` back to the plain
+    # `str` placeholder so routes are registered without enum validation
+    # (tests deliberately exercise the 404 path; the enum dropdown behaviour
+    # is covered by TestRoomIdDropdown).
     room_router.reset_scene_state()
+    room_router.set_home(None)
 
     test_app = FastAPI()
     test_app.include_router(home_router.router, prefix="", tags=["home"])

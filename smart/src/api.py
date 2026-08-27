@@ -13,6 +13,13 @@ def create_app() -> FastAPI:
     hue_bridges = get_hue_bridges()
     home = Home([Hue(b.ip, b.key) for b in hue_bridges])
 
+    # Configure routers *before* registration so FastAPI resolves dynamic path
+    # parameter types (e.g. the room-id dropdown) at route-registration time.
+    home_router.set_home(home)
+    home_router.set_config(config)
+    room_router.set_home(home)
+    lamp_router.set_home(home)
+
     app = FastAPI()
 
     app.include_router(home_router.router, prefix="", tags=["home"])
@@ -22,11 +29,6 @@ def create_app() -> FastAPI:
     @app.get("/")
     async def root():
         return {"message": "Hello World"}
-
-    home_router.set_home(home)
-    home_router.set_config(config)
-    room_router.set_home(home)
-    lamp_router.set_home(home)
 
     return app
 

@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    ports:
+      - "8555:8000"
     environment:
       - HUE_IP=${HUE_IP}
       - HUE1_IP=${HUE1_IP}

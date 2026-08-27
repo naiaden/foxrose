@@ -1,3 +1,7 @@
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from src.routers import room as room_router
 from tests.conftest import (
     MockGroup,
     MockRoom,
@@ -5,6 +9,46 @@ from tests.conftest import (
     create_test_client,
     make_mock_home,
 )
+
+
+class TestRoomList:
+    def test_room_list_returns_all_rooms(self):
+        room1 = MockRoom("room1", "Living", groups=[], scenes=[])
+        room2 = MockRoom("room2", "Kitchen", groups=[], scenes=[])
+        mock_home = make_mock_home(rooms=[room1, room2])
+        client = create_test_client(mock_home)
+
+        response = client.get("/room")
+        assert response.status_code == 200
+        assert response.json() == [["Living", "room1"], ["Kitchen", "room2"]]
+
+    def test_room_list_empty_home(self):
+        mock_home = make_mock_home(rooms=[])
+        client = create_test_client(mock_home)
+
+        response = client.get("/room")
+        assert response.status_code == 200
+        assert response.json() == []
+
+
+class TestRoomScenes:
+    def test_room_scenes_found(self):
+        scene1 = MockScene("Scene 1")
+        scene2 = MockScene("Scene 2")
+        room = MockRoom("room1", "Living", groups=[], scenes=[scene1, scene2])
+        mock_home = make_mock_home(rooms=[room])
+        client = create_test_client(mock_home)
+
+        response = client.get("/room/room1/scenes")
+        assert response.status_code == 200
+        assert response.json() == ["Scene 1", "Scene 2"]
+
+    def test_room_scenes_not_found(self):
+        mock_home = make_mock_home(rooms=[])
+        client = create_test_client(mock_home)
+
+        response = client.get("/room/unknown/scenes")
+        assert response.status_code == 404
 
 
 class TestRoomInfo:
@@ -132,3 +176,37 @@ class TestRoomSceneNext:
 
         client.post("/room/room-a/scene/next")  # room-a -> scene A2
         assert scene_a2.activated is True
+
+
+class TestRoomIdDropdown:
+    """When routes are registered *after* `set_home()`, the `room_id` path
+    parameter becomes an Enum of available rooms (rendering a dropdown in the
+    docs page). Invalid room ids are then rejected by validation (422)."""
+
+    def test_room_id_is_enum_when_registered_after_set_home(self):
+        room = MockRoom("room1", "Living")
+        mock_home = make_mock_home(rooms=[room])
+
+        # set_home before include_router -> RoomId resolves to the room Enum
+        room_router.set_home(mock_home)
+
+        test_app = FastAPI()
+        test_app.include_router(room_router.router, tags=["room"])
+        client = TestClient(test_app)
+
+        # Unknown room id -> enum validation failure (422), not the 404 path
+        assert client.get("/room/unknown").status_code == 422
+        # Known room id -> works
+        assert client.get("/room/room1").status_code == 200
+
+    def test_room_id_falls_back_to_str_without_rooms(self):
+        mock_home = make_mock_home(rooms=[])
+
+        room_router.set_home(mock_home)
+
+        test_app = FastAPI()
+        test_app.include_router(room_router.router, tags=["room"])
+        client = TestClient(test_app)
+
+        # No rooms -> no enum -> any id yields the regular 404 path
+        assert client.get("/room/unknown").status_code == 404
