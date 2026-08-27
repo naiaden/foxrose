@@ -1,65 +1,20 @@
+# DEPRECATED: This is a legacy entry point. Use main.py instead.
+# The new configuration system uses config.yaml instead of environment variables.
+# ruff: noqa
 import paho.mqtt.client as mqtt
-import json
-import requests
 import os
-import logging
+from logging_config import logger
 from systems.telegram import FoxRoseHandler
-from systems.dahua import get_snapshot
-from modes import Mode
 
-from events.change_event import UserSettingsChangedEvent, UserSettingsType
-from events.detection_event import CameraActiveEventHandler, CameraDetectionEvent
-from events.doorcard_event import DoorCardEvent
-from events.device_event import BatteryEvent, LowBatteryEvent
-import time
+from events.detection_event import CameraActiveEventHandler
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[logging.StreamHandler()]
-)
+logger.info("start foxrose event handler (legacy entry point)")
 
-logger = logging.getLogger(__name__)
-
-logger.info("start foxrose event handler")
-
-
-def doorcard(msg):
-    
-    payload = json.loads(msg.payload.decode())
-
-    DoorCardEvent(payload['Data']['Number']).handle(system)
-
-
-def from_bot(msg):
-    parts = msg.topic.split("/")
-    user_id = int(parts[3])
-    camera = parts[5]
-    enabled = msg.payload.decode().strip() == "1"
-
-    UserSettingsChangedEvent(user_id, UserSettingsType.CAMERA_PREFERENCE, camera, enabled).handle(system)
-
-def from_device(msg):
-    device = msg.topic.split('/')[1]
-    payload = json.loads(msg.payload.decode())
-
-    if percentage := payload.get('battery', None):
-        BatteryEvent(device, battery)
 
 from events import *
 
-def person_detected(msg):
-    parts = msg.topic.split('/')
-    camera_name = parts[1]
-    
-    CameraDetectionEvent(camera_name, msg.payload).handle(system)
-
-def frigate_event(msg):
-    payload = json.loads(msg.payload.decode())
-    system.camera_active_event_handler.process(system, payload["after"]["id"], payload["after"]["camera"], payload)
-    
-MQTT_SERVER = os.environ['mqtt_server']
-MQTT_SERVER_SECOND = os.environ['mqtt_server_second']
+MQTT_SERVER = os.environ["mqtt_server"]
+MQTT_SERVER_SECOND = os.environ["mqtt_server_second"]
 
 
 mqttc = None
@@ -68,15 +23,24 @@ mqtts = None
 from systems.camera import CameraSystem
 from systems.notification import NotificationSystem
 
+
 class System:
     def __init__(self):
-        self.allowed_users = [int(uid.strip()) for uid in os.environ['ALLOWED_USERS'].split(',')]
-        self.valid_doorcards = os.environ['VALID_DOORCARDS'].split(',')
-        self.key_map = {k: v.split(',') for x in os.environ['KEY_MAP'].split(';') for k, v in [x.split(':')]}
+        self.allowed_users = [
+            int(uid.strip()) for uid in os.environ["ALLOWED_USERS"].split(",")
+        ]
+        self.valid_doorcards = os.environ["VALID_DOORCARDS"].split(",")
+        self.key_map = {
+            k: v.split(",")
+            for x in os.environ["KEY_MAP"].split(";")
+            for k, v in [x.split(":")]
+        }
 
         self.camera_system = CameraSystem()
         self.camera_active_event_handler = CameraActiveEventHandler()
-        self.notification_system = NotificationSystem(self.allowed_users, self.camera_system.captured_cameras, mqttc)
+        self.notification_system = NotificationSystem(
+            self.allowed_users, self.camera_system.captured_cameras, mqttc
+        )
 
 
 system = System()
@@ -84,46 +48,8 @@ system = System()
 # def doorbell(msg):
 #     requests.post(f'http://{settings["loxone_server"]}/dev/sps/io/mqtt_deurbel_gaat/1')
 
-def on_connect(client, userdata, flags, reason_code, properties):
-    logger.info(f"Connected to main with result code {reason_code}")
-    client.subscribe("DahuaVTO/DoorCard/Event/#") 
-    client.subscribe("DahuaVTO/Invite/Event/#") 
-    client.subscribe("zigbee2mqtt/+")
-    client.subscribe(f"{system.notification_system.mqtt_topic}/bot/users/+/cameras/+")
 
-def on_message(client, userdata, msg):
-    logger.debug(msg.topic+" "+str(msg.payload))
-
-    if msg.topic.startswith(f"{system.notification_system.mqtt_topic}/bot/users/"):
-        from_bot(msg)
-    elif msg.topic.startswith("zigbee2mqtt"):
-        from_device(msg)
-
-    match msg.topic:
-        case "DahuaVTO/DoorCard/Event":
-            doorcard(msg) 
-        case "DahuaVTO/Invite/Event":
-            doorbell(msg)
-    
-def on_connect_second(client, userdata, flags, reason_code, properties):
-    logger.info(f"Connected to second (frigate) with result code {reason_code}")
-    client.subscribe("frigate/+/+/snapshot")
-    client.subscribe("frigate/events")
-
-def on_message_second(client, userdata, msg):
-    if msg.topic == "frigate/events":
-        frigate_event(msg)
-    else:
-        logger.debug("Person detected: " + msg.topic)
-
-        person_detected(msg)
-
-    
-        
-
-    
-
-logger.info('init')
+logger.info("init")
 
 mqttc = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 mqttc.enable_logger(logger)
@@ -137,8 +63,7 @@ mqtts.on_message = on_message_second
 bot = FoxRoseHandler(system)
 
 
-logging.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
-
+logger.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
 logger.info(f"{MQTT_SERVER=}")
 logger.info(f"{MQTT_SERVER_SECOND=}")
 
@@ -149,7 +74,7 @@ try:
     mqtts.loop_start()
 
     system.notification_system.mqtt_publish_server = mqttc
-    logging.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
+    logger.info(f"server: {mqttc}, is connected? {mqttc.is_connected()}")
 
     bot.run()
 
@@ -162,7 +87,6 @@ except KeyboardInterrupt:
     logger.info("Stopping...")
     mqttc.loop_stop()
     mqtts.loop_stop()
-
 
 
 # {

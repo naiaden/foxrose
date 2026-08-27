@@ -1,0 +1,74 @@
+# FoxRose Configuration Example
+# Copy this file to config.yaml and customize for your setup
+
+# MQTT Configuration
+mqtt:
+  main_server: "192.168.0.1"
+  frigate_server: "192.168.0.2"
+
+# Servers Configuration
+servers:
+  frigate_server: "192.168.0.2"
+
+# Door stations
+doors:
+  achterdeur:
+    ip: "192.168.1.1"
+    account: "admin"
+    password: "your_password"
+    location: "9901"
+  voordeur:
+    ip: "192.168.1.2"
+    account: "admin"
+    password: "your_password"
+    location: "9903"
+
+# Notification settings
+notification:
+  doorbell_topic: "your_ntfy_topic"
+  bot_name: "foxrosehip"
+
+# Users configuration
+users:
+  - name: your_name
+    telegram_id: 123456789
+    keycards:
+      - card_id_1
+      - card_id_2
+
+# Valid doorcard IDs (for access control)
+valid_doorcards:
+  - card_id_1
+  - card_id_2
+
+# Frigate cameras
+frigate_cameras:
+  - frontdoor
+  - backdoor
+  - patio
+
+# Temperature sensors
+thermometers:
+  "0x_sensor_id_1": "Room Name 1"
+  "0x_sensor_id_2": "Room Name 2"
+
+# Presence sensors
+sensors:
+  - device_id: "001"
+    name: "front_door"
+    type: OUTDOOR
+  - device_id: "002"
+    name: "living_room"
+    type: INDOOR
+
+# Presence event window timeout in seconds
+# Events from the same sensor within this window are suppressed
+# Default: 300 (5 minutes)
+# presence_window_seconds: 300
+
+# System monitoring configuration
+system_monitor:
+  cpu_threshold: 80.0
+  swap_threshold: 90.0
+  tmp_threshold: 90.0
+  check_interval: 60

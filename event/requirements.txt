@@ -2,3 +2,12 @@ paho-mqtt
 requests
 python-telegram-bot
 colorama
+humanize
+loguru
+pytest
+pytest-cov
+pyyaml
+ruff
+black
+pre-commit
+psutil
