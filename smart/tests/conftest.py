@@ -31,6 +31,11 @@ class MockGroup:
     def brightness(self, value):
         self._brightness = max(0, min(value, 100))
 
+    def set_brightness(self, brightness, duration_ms=0):
+        self._brightness = max(0, min(brightness, 100))
+        self._on = brightness > 0
+        self._duration_ms = duration_ms
+
 
 class MockScene:
     def __init__(self, name):

@@ -154,6 +154,29 @@ class Group:
         self.on = True
         self.reference.brightness = max(0, min(brightness, 100))
 
+    def set_brightness(self, brightness, duration_ms=0):
+        """Set the group's brightness, optionally fading over a duration.
+
+        Delegates to ``GroupedLight.set_state`` which maps ``duration_ms`` to
+        the Hue API v2 ``dynamics.duration`` field (milliseconds), producing a
+        smooth transition on supported bridges. When ``duration_ms`` is zero
+        the brightness is applied instantly via the regular setter.
+
+        Args:
+            brightness: Target brightness (clamped to 0–100).
+            duration_ms: Fade duration in milliseconds. ``0`` means instant.
+        """
+        brightness = max(0, min(brightness, 100))
+        if duration_ms > 0:
+            self.reference.set_state(
+                on=brightness > 0,
+                brightness=brightness if brightness > 0 else None,
+                duration_ms=duration_ms,
+            )
+        else:
+            self.on = True
+            self.reference.brightness = brightness
+
     @property
     def on(self):
         return self.reference.on

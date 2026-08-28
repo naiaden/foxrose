@@ -92,6 +92,72 @@ class TestRoomActive:
         assert group.on is False
 
 
+class TestRoomBrightness:
+    def test_room_brightness_with_fade(self):
+        group = MockGroup(on=False, brightness=0)
+        room = MockRoom("room1", "Living", groups=[group])
+        mock_home = make_mock_home(rooms=[room])
+        client = create_test_client(mock_home)
+
+        response = client.post("/room/room1/brightness/75/3000")
+        assert response.status_code == 200
+        assert group.brightness == 75
+        assert group._on is True
+        assert group._duration_ms == 3000
+
+    def test_room_brightness_clamped(self):
+        group = MockGroup(on=False, brightness=0)
+        room = MockRoom("room1", "Living", groups=[group])
+        mock_home = make_mock_home(rooms=[room])
+        client = create_test_client(mock_home)
+
+        response = client.post("/room/room1/brightness/150/5000")
+        assert response.status_code == 200
+        assert group.brightness == 100
+
+    def test_room_brightness_clamped_negative(self):
+        group = MockGroup(on=False, brightness=50)
+        room = MockRoom("room1", "Living", groups=[group])
+        mock_home = make_mock_home(rooms=[room])
+        client = create_test_client(mock_home)
+
+        response = client.post("/room/room1/brightness/-10/0")
+        assert response.status_code == 200
+        assert group.brightness == 0
+
+    def test_room_brightness_instant(self):
+        group = MockGroup(on=False, brightness=0)
+        room = MockRoom("room1", "Living", groups=[group])
+        mock_home = make_mock_home(rooms=[room])
+        client = create_test_client(mock_home)
+
+        response = client.post("/room/room1/brightness/100/0")
+        assert response.status_code == 200
+        assert group.brightness == 100
+        assert group._on is True
+
+    def test_room_brightness_not_found(self):
+        mock_home = make_mock_home(rooms=[])
+        client = create_test_client(mock_home)
+
+        response = client.post("/room/unknown/brightness/50/2000")
+        assert response.status_code == 404
+
+    def test_room_brightness_multiple_groups(self):
+        group1 = MockGroup(on=False, brightness=0)
+        group2 = MockGroup(on=False, brightness=0)
+        room = MockRoom("room1", "Living", groups=[group1, group2])
+        mock_home = make_mock_home(rooms=[room])
+        client = create_test_client(mock_home)
+
+        response = client.post("/room/room1/brightness/80/4000")
+        assert response.status_code == 200
+        assert group1.brightness == 80
+        assert group2.brightness == 80
+        assert group1._duration_ms == 4000
+        assert group2._duration_ms == 4000
+
+
 class TestRoomNight:
     def test_room_night_found(self):
         night_scene = MockScene("Nightlight")
