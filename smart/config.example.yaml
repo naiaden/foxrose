@@ -1,0 +1,7 @@
+# FoxRose Smart Configuration Example
+# Copy this file to config.yaml and customize for your setup
+
+# Default active rooms when toggling home on (optional)
+default_active_rooms:
+  - eetkamer
+  - woonkamer

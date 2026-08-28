@@ -1,10 +1,8 @@
-
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
-
+logger = logging.getLogger(__name__)
 
 """
     The highest level of abstraction for an actual house powered by hue lights.
@@ -12,127 +10,132 @@ from typing import Optional
     
     A home consists of physical rooms and lamps, and abstract groups and scenes.
 """
+
+
 class Home:
     """
-        Create a new, and initialised home instance
+    Create a new, and initialised home instance
     """
+
     def __init__(self, bridges) -> None:
         self.hues = bridges
         print(f"{len(self.hues)} bridges in this home")
         for b in self.hues:
-            logging.debug(b.bridge.ip_address)
+            logger.debug(b.bridge.ip_address)
 
-        return self.initialise()
+        self.initialise()
 
     """
         Rooms are lazily initialised, and its groups and scenes are added afterwards 
         as they can have a reference to their parent (Room).
     """
+
     def initialise(self) -> None:
         self.lamps = self.initialise_lamps()
-        logging.info(f"{len(self.lamps)} lamps initialised")
-        for l in self.lamps:
-            logging.debug(l.id, l.name, l.parent_id, l.bridge.bridge.ip_address)
+        logger.info(f"{len(self.lamps)} lamps initialised")
+        for lamp in self.lamps:
+            logger.debug(
+                lamp.id, lamp.name, lamp.parent_id, lamp.bridge.bridge.ip_address
+            )
 
         self.rooms = self.initialise_rooms()
-        logging.info(f"{len(self.rooms)} rooms lazily initialised")
+        logger.info(f"{len(self.rooms)} rooms lazily initialised")
         for r in self.rooms:
             print(str(r))
 
         self.scenes = self.initialise_scenes()
-        logging.info(f"{len(self.scenes)} scenes initialised")
+        logger.info(f"{len(self.scenes)} scenes initialised")
         for s in self.scenes:
-            logging.debug(str(s))
+            logger.debug(str(s))
 
         self.connect_scenes_to_rooms()
 
         self.groups = self.initialise_groups()
         print(f"{len(self.groups)} groups initialised")
         for g in self.groups:
-            logging.debug(str(g))
+            logger.debug(str(g))
 
         self.connect_groups_to_rooms()
 
     def connect_groups_to_rooms(self) -> None:
         for group in self.groups:
-            room_id = group.reference.data_dict['owner']['rid']
+            room_id = group.reference.data_dict["owner"]["rid"]
             if room := self.get_room_with_id(room_id):
                 room.groups.append(group)
 
     def connect_scenes_to_rooms(self) -> None:
         for scene in self.scenes:
-            room_id = scene.reference.data.data_dict['group']['rid']
+            room_id = scene.reference.data.data_dict["group"]["rid"]
             if room := self.get_room_with_id(room_id):
                 room.scenes.append(scene)
 
-    def get_lamp_with_id(self, lamp_id:str) -> Optional[Lamp]:
+    def get_lamp_with_id(self, lamp_id: str) -> Lamp | None:
         for lamp in self.lamps:
             if lamp.id == lamp_id:
                 return lamp
-            
-    def get_lamp_with_pid(self, lamp_pid: str) -> Optional[Lamp]:
+
+    def get_lamp_with_pid(self, lamp_pid: str) -> Lamp | None:
         for lamp in self.lamps:
             if lamp.parent_id == lamp_pid:
                 return lamp
 
-    def get_room_with_id(self, room_id: str) -> Optional[Room]:
+    def get_room_with_id(self, room_id: str) -> Room | None:
         for room in self.rooms:
             if room.id == room_id:
                 return room
-            
-    def get_room_with_name(self, room_name: str) -> Optional[Room]:
+
+    def get_room_with_name(self, room_name: str) -> Room | None:
         for room in self.rooms:
             if room.name == room_name:
                 return room
 
-    
     def initialise_lamps(self) -> list[Lamp]:
         return [Lamp(light, bridge) for bridge in self.hues for light in bridge.lights]
-    
+
     def initialise_rooms(self) -> list[Room]:
         return [Room(room, self) for bridge in self.hues for room in bridge.rooms]
-    
+
     def initialise_scenes(self) -> list[Scene]:
         return [Scene(scene) for bridge in self.hues for scene in bridge.scenes]
-    
+
     def initialise_groups(self) -> list[Group]:
         return [Group(group) for bridge in self.hues for group in bridge.grouped_lights]
 
 
 class Room:
-    def __init__(self, room: python_hue_v2.room.Room, home: Home):
+    def __init__(self, room, home: Home):
         self.id = room.id
-        self.name = room.get().data_dict['metadata']['name']
+        self.name = room.get().data_dict["metadata"]["name"]
 
         self.reference = room
 
         self.lamps = []
         for child in room.get().children:
-            lamp = home.get_lamp_with_pid(child.data_dict['rid'])
+            lamp = home.get_lamp_with_pid(child.data_dict["rid"])
             self.lamps.append(lamp)
 
         self.scenes = []
         self.groups = []
-  
 
     def __str__(self) -> str:
         return f"{self.name} [{self.id}]"
-    
+
     def summary(self) -> dict:
         return {
-            'name': self.name,
-            'id': self.id,
-            'nr_lamps': len(self.lamps),
-            'lamps': [(str(l), str(l.id)) for l in self.lamps],
-            'nr_scenes': len(self.scenes),
-            'scenes': [str(s) for s in self.scenes],
-            'nr_groups': len(self.groups),
-            'groups': [str(g) for g in self.groups]
+            "name": self.name,
+            "id": self.id,
+            "nr_lamps": len(self.lamps),
+            "lamps": [(str(lamp), str(lamp.id)) for lamp in self.lamps],
+            "nr_scenes": len(self.scenes),
+            "scenes": [str(s) for s in self.scenes],
+            "nr_groups": len(self.groups),
+            "groups": [str(g) for g in self.groups],
         }
+
 
 class Group:
     def __init__(self, group):
-        self.id = group.data_dict['id']
+        self.id = group.data_dict["id"]
 
         self.reference = group
 
@@ -141,43 +144,68 @@ class Group:
 
     def __str__(self):
         return f"{self.id}"
-    
+
     @property
     def brightness(self):
         return self.reference.brightness
-    
+
     @brightness.setter
     def brightness(self, brightness):
         self.on = True
         self.reference.brightness = max(0, min(brightness, 100))
 
+    def set_brightness(self, brightness, duration_ms=0):
+        """Set the group's brightness, optionally fading over a duration.
+
+        Delegates to ``GroupedLight.set_state`` which maps ``duration_ms`` to
+        the Hue API v2 ``dynamics.duration`` field (milliseconds), producing a
+        smooth transition on supported bridges. When ``duration_ms`` is zero
+        the brightness is applied instantly via the regular setter.
+
+        Args:
+            brightness: Target brightness (clamped to 0–100).
+            duration_ms: Fade duration in milliseconds. ``0`` means instant.
+        """
+        brightness = max(0, min(brightness, 100))
+        if duration_ms > 0:
+            self.reference.set_state(
+                on=brightness > 0,
+                brightness=brightness if brightness > 0 else None,
+                duration_ms=duration_ms,
+            )
+        else:
+            self.on = True
+            self.reference.brightness = brightness
+
     @property
     def on(self):
         return self.reference.on
-    
+
     @on.setter
     def on(self, active):
         self.reference.on = active
 
+
 class Scene:
     def __init__(self, scene):
         self.id = scene.id
-        self.name = scene.data.data_dict['metadata']['name']
+        self.name = scene.data.data_dict["metadata"]["name"]
 
         self.reference = scene
 
     def activate(self):
-        self.reference.recall(action='active')
+        self.reference.recall(action="active")
 
     def __str__(self):
         return f"{self.name}"
 
+
 class Lamp:
     def __init__(self, light, bridge):
         self.data = light.data_dict
-        self.id = self.data['id']
-        self.name = self.data['metadata']['name']
-        self.parent_id = self.data['owner']['rid']
+        self.id = self.data["id"]
+        self.name = self.data["metadata"]["name"]
+        self.parent_id = self.data["owner"]["rid"]
         self.bridge = bridge
 
         self.reference = light
@@ -185,7 +213,7 @@ class Lamp:
     @property
     def brightness(self):
         return self.reference.brightness
-    
+
     @brightness.setter
     def brightness(self, brightness):
         self.reference.brightness = max(0, min(brightness, 100))
@@ -193,37 +221,36 @@ class Lamp:
 
     @property
     def colour(self):
-        try:
-            return ('mirek', self.reference.data_dict['color_temperature']['mirek'])
-        except:
-            return ('colour', self.reference.color_xy)
-    
+        color_temp = self.reference.data_dict.get("color_temperature")
+        if color_temp is not None:
+            return ("mirek", color_temp["mirek"])
+        return ("colour", self.reference.color_xy)
+
     @colour.setter
     def colour(self, value: int):
-        # self.reference.color_xy = value
-        try:
-            self.reference._set('color_temperature', { 'mirek': value })
-        except:
+        if "color_temperature" in self.reference.data_dict:
+            self.reference._set("color_temperature", {"mirek": value})
+        else:
             self.reference.color_xy = value
 
     @property
     def on(self):
         return self.reference.on
-    
+
     @on.setter
     def on(self, active):
         self.reference.on = active
 
     def __str__(self) -> str:
         return self.name
-    
+
     def summary(self):
         return {
-            'name': self.name,
-            'id': self.id,
-            'on': self.on,
-            'brightness': self.brightness,
-            'colour': self.colour,
-            'data': self.reference.data_dict,
-            'bridge': self.bridge.bridge.ip_address,
+            "name": self.name,
+            "id": self.id,
+            "on": self.on,
+            "brightness": self.brightness,
+            "colour": self.colour,
+            "data": self.reference.data_dict,
+            "bridge": self.bridge.bridge.ip_address,
         }
